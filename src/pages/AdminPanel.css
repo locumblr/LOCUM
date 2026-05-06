@@ -1,0 +1,41 @@
+.admin-container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.admin-header h1 { color: #1e3a5f; font-size: 28px; }
+.logout-btn { padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 8px; cursor: pointer; }
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+.stat-card { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.stat-card h3 { font-size: 36px; color: #e74c3c; margin-bottom: 4px; }
+.stat-card.green h3 { color: #27ae60; }
+.stat-card p { color: #888; font-size: 14px; }
+.tabs { display: flex; gap: 4px; background: #f0f4f8; border-radius: 10px; padding: 4px; margin-bottom: 24px; width: fit-content; }
+.tabs button { padding: 10px 24px; border: none; border-radius: 8px; cursor: pointer; background: transparent; color: #555; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.tabs button.active { background: #1e3a5f; color: white; }
+.badge { background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+.table-container { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.admin-table th { background: #1e3a5f; color: white; padding: 14px 16px; text-align: left; font-size: 14px; }
+.admin-table td { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #333; }
+.admin-table tr:last-child td { border-bottom: none; }
+.admin-table tr:hover td { background: #f9f9f9; }
+.status-pill { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
+.status-pill.pending { background: #fff3e0; color: #e65100; }
+.status-pill.active { background: #e8f5e9; color: #2e7d32; }
+.status-pill.rejected { background: #fce4ec; color: #c62828; }
+.status-pill.frozen { background: #e3f2fd; color: #1565c0; }
+.view-btn { padding: 6px 12px; background: #e3f2fd; color: #1565c0; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+.approve-btn { padding: 6px 12px; background: #e8f5e9; color: #2e7d32; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+.reject-btn { padding: 6px 12px; background: #fce4ec; color: #c62828; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+.freeze-btn { padding: 6px 12px; background: #fff3e0; color: #e65100; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+.unfreeze-btn { padding: 6px 12px; background: #e8f5e9; color: #2e7d32; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+.delete-btn { padding: 6px 12px; background: #fce4ec; color: #c62828; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal { background: white; border-radius: 16px; padding: 32px; width: 90%; max-width: 560px; }
+.modal h2 { color: #1e3a5f; margin-bottom: 24px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.detail-grid label { font-size: 12px; color: #888; font-weight: 600; text-transform: uppercase; }
+.detail-grid p { font-size: 15px; color: #333; margin-top: 4px; }
+.modal-actions { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.modal-actions .approve-btn, .modal-actions .reject-btn, .modal-actions .freeze-btn, .modal-actions .unfreeze-btn, .modal-actions .delete-btn { padding: 12px 24px; font-size: 14px; }
+.close-btn { width: 100%; padding: 12px; background: #f0f4f8; color: #555; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.loading { text-align: center; color: #888; padding: 40px; }
+.empty { text-align: center; color: #888; padding: 40px; }

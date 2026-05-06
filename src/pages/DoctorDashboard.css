@@ -1,0 +1,137 @@
+.dashboard-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-header h1 {
+  color: #1e3a5f;
+  font-size: 32px;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.header-buttons button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #1e3a5f;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.header-buttons button:hover {
+  background: #16304d;
+}
+
+.header-buttons button.logout {
+  background: #e74c3c;
+}
+
+.header-buttons button.logout:hover {
+  background: #c0392b;
+}
+
+h2 {
+  color: #1e3a5f;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  color: #888;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.duties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.duty-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: 0.3s;
+}
+
+.duty-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.duty-card.booked {
+  opacity: 0.6;
+  background: #f9f9f9;
+}
+
+.duty-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.duty-header h3 {
+  color: #1e3a5f;
+  font-size: 18px;
+}
+
+.pay {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.duty-details p {
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.book-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 14px;
+  background: #1e3a5f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.book-btn:hover {
+  background: #16304d;
+}
+
+.booked-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 14px;
+  background: #ccc;
+  color: #666;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: not-allowed;
+}

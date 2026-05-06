@@ -1,0 +1,271 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
+import "./Register.css";
+
+function Register() {
+  const navigate = useNavigate();
+  const [role, setRole] = useState(null);
+
+  return (
+    <div className="register-container">
+      <h1>Create Account</h1>
+      <p>Register as a Doctor or Hospital</p>
+
+      {!role && (
+        <div className="role-select">
+          <button onClick={() => setRole("doctor")}>I am a Doctor</button>
+          <button onClick={() => setRole("hospital")}>I am a Hospital</button>
+        </div>
+      )}
+
+      {role === "doctor" && <DoctorForm navigate={navigate} />}
+      {role === "hospital" && <HospitalForm navigate={navigate} />}
+
+      {role && (
+        <p className="back-link" onClick={() => setRole(null)}>
+          ← Go back
+        </p>
+      )}
+
+      <p className="switch-link">
+        Already have an account?{" "}
+        <span onClick={() => navigate("/login")}>Login here</span>
+      </p>
+    </div>
+  );
+}
+
+function DoctorForm({ navigate }) {
+  const [form, setForm] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    qualification: "", experience: "", idNumber: "",
+    password: "", confirmPassword: "",
+  });
+  const [certificate, setCertificate] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const qualifications = [
+    "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
+    "MD - General Medicine",
+    "MD - Paediatrics",
+    "MD - Psychiatry",
+    "MD - Dermatology",
+    "MD - Anaesthesiology",
+    "MD - Radiology",
+    "MD - Pathology",
+    "MD - Microbiology",
+    "MD - Biochemistry",
+    "MD - Community Medicine",
+    "MS - General Surgery",
+    "MS - Orthopaedics",
+    "MS - Ophthalmology",
+    "MS - ENT (Otorhinolaryngology)",
+    "MS - Obstetrics & Gynaecology",
+    "MCh - Neurosurgery",
+    "MCh - Cardiothoracic Surgery",
+    "MCh - Plastic Surgery",
+    "MCh - Urology",
+    "DM - Cardiology",
+    "DM - Neurology",
+    "DM - Nephrology",
+    "DM - Gastroenterology",
+    "DM - Endocrinology",
+    "DM - Oncology",
+    "DNB - General Medicine",
+    "DNB - General Surgery",
+    "DNB - Paediatrics",
+    "DNB - Obstetrics & Gynaecology",
+    "DNB - Orthopaedics",
+    "DNB - Anaesthesiology",
+    "BDS / MDS (Dentistry)",
+    "B.Pharm / M.Pharm (Pharmacy)",
+    "B.Sc Nursing / M.Sc Nursing",
+    "Diploma in Anaesthesiology (DA)",
+    "Diploma in Child Health (DCH)",
+    "Diploma in Obstetrics & Gynaecology (DGO)",
+    "Diploma in Orthopaedics (D.Ortho)",
+    "Diploma in Ophthalmology (DO)",
+    "Diploma in ENT",
+    "Diploma in Radiology (DMRD)",
+    "Fellowship in Emergency Medicine (FCEM)",
+    "Other",
+  ];
+
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match!");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Create auth account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: { role: "doctor" }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Save doctor details to doctors table
+      const { error: dbError } = await supabase.from("doctors").insert({
+        id: authData.user.id,
+        first_name: form.firstName,
+        last_name: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        id_number: form.idNumber,
+        qualification: form.qualification,
+        experience: parseInt(form.experience),
+        status: "pending",
+      });
+
+      if (dbError) throw dbError;
+
+      alert("Application submitted successfully! You will receive an email once your account is verified by our admin team.");
+      navigate("/");
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="register-form">
+      <h2>Doctor Registration</h2>
+
+      {error && <p className="error-msg">{error}</p>}
+
+      <div className="form-row">
+        <input name="firstName" placeholder="First Name" required onChange={handle} />
+        <input name="lastName" placeholder="Last Name" required onChange={handle} />
+      </div>
+
+      <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
+      <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
+      <input name="idNumber" placeholder="ID / Passport Number" required onChange={handle} />
+
+      <select name="qualification" required onChange={handle} defaultValue="">
+        <option value="" disabled>Select Your Qualification</option>
+        {qualifications.map((q) => (
+          <option key={q} value={q}>{q}</option>
+        ))}
+      </select>
+
+      <input name="experience" placeholder="Years of Experience" type="number" required onChange={handle} />
+
+      <label className="file-label">
+        Upload Certificate / Proof of Qualification
+        <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
+      </label>
+
+      <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
+      <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
+
+      <button type="submit" disabled={loading}>
+        {loading ? "Submitting..." : "Submit Application"}
+      </button>
+    </form>
+  );
+}
+
+function HospitalForm({ navigate }) {
+  const [form, setForm] = useState({
+    hospitalName: "", email: "", phone: "",
+    address: "", registrationNumber: "",
+    contactPerson: "", password: "", confirmPassword: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match!");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Create auth account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: { role: "hospital" }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Save hospital details to hospitals table
+      const { error: dbError } = await supabase.from("hospitals").insert({
+        id: authData.user.id,
+        hospital_name: form.hospitalName,
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+        registration_number: form.registrationNumber,
+        contact_person: form.contactPerson,
+        status: "pending",
+      });
+
+      if (dbError) throw dbError;
+
+      alert("Application submitted successfully! You will receive an email once your account is verified by our admin team.");
+      navigate("/");
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="register-form">
+      <h2>Hospital Registration</h2>
+
+      {error && <p className="error-msg">{error}</p>}
+
+      <input name="hospitalName" placeholder="Hospital / Clinic Name" required onChange={handle} />
+      <input name="email" type="email" placeholder="Official Email Address" required onChange={handle} />
+      <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
+      <input name="address" placeholder="Physical Address" required onChange={handle} />
+      <input name="registrationNumber" placeholder="Hospital Registration Number" required onChange={handle} />
+      <input name="contactPerson" placeholder="Contact Person Full Name" required onChange={handle} />
+
+      <label className="file-label">
+        Upload Registration Certificate
+        <input type="file" accept=".pdf,.jpg,.png" required />
+      </label>
+
+      <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
+      <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
+
+      <button type="submit" disabled={loading}>
+        {loading ? "Submitting..." : "Submit Application"}
+      </button>
+    </form>
+  );
+}
+
+export default Register;
