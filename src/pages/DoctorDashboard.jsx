@@ -29,6 +29,34 @@ function DoctorDashboard() {
       setDoctorName(`${doctor.first_name} ${doctor.last_name}`);
       setDoctorQualification(doctor.qualification);
       fetchDuties(doctor.qualification);
+      subscribeToPush(doctor.qualification);
+    }
+  };
+
+  const subscribeToPush = async (qualification) => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+
+      const registration = await navigator.serviceWorker.ready;
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: 'BIRe1rpvBs-8IxaS8YG9dvCm5Jk-12bP2GTtan-lRPKH7JaDQUwSCjVB9-CdCBBb66jREzWif0NW7XSk0YRVl9o'
+      });
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      await supabase.from('push_subscriptions').upsert({
+        doctor_id: user.id,
+        qualification: qualification,
+        subscription: JSON.stringify(subscription),
+      }, { onConflict: 'doctor_id' });
+
+    } catch (err) {
+      console.error('Push subscription error:', err);
     }
   };
 
@@ -38,6 +66,8 @@ function DoctorDashboard() {
       .from("locum_duties")
       .select("*, hospitals(hospital_name, address)")
       .eq("qualification", qualification)
+      .eq("booked", false)
+      .eq("completed", false)
       .order("date", { ascending: true });
 
     if (!error) setDuties(data || []);
@@ -54,7 +84,6 @@ function DoctorDashboard() {
 
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Check if already booked
     const { data: latest } = await supabase
       .from("locum_duties")
       .select("booked")
@@ -77,7 +106,7 @@ function DoctorDashboard() {
     if (error) {
       alert("Error booking duty: " + error.message);
     } else {
-      alert(`Booking confirmed! You will be notified with full details shortly.`);
+      alert("Booking confirmed! You will be notified with full details shortly.");
       fetchDuties(doctorQualification);
     }
 
@@ -117,7 +146,7 @@ function DoctorDashboard() {
       ) : (
         <div className="duties-grid">
           {duties.map((duty) => (
-            <div key={duty.id} className={`duty-card ${duty.booked ? "booked" : ""}`}>
+            <div key={duty.id} className="duty-card">
               <div className="duty-header">
                 <h3>{duty.hospitals?.hospital_name || "Hospital"}</h3>
                 <span className="pay">₹{duty.pay}</span>
@@ -129,17 +158,13 @@ function DoctorDashboard() {
                 <p>🎓 {duty.qualification}</p>
                 {duty.notes && <p>📝 {duty.notes}</p>}
               </div>
-              {duty.booked ? (
-                <button className="booked-btn" disabled>Booked</button>
-              ) : (
-                <button
-                  className="book-btn"
-                  onClick={() => bookDuty(duty)}
-                  disabled={booking === duty.id}
-                >
-                  {booking === duty.id ? "Booking..." : "Book Duty"}
-                </button>
-              )}
+              <button
+                className="book-btn"
+                onClick={() => bookDuty(duty)}
+                disabled={booking === duty.id}
+              >
+                {booking === duty.id ? "Booking..." : "Book Duty"}
+              </button>
             </div>
           ))}
         </div>

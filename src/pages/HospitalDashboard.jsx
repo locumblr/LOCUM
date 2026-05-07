@@ -72,7 +72,11 @@ function HospitalDashboard() {
   const fetchHospitalData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-    const { data } = await supabase.from("hospitals").select("hospital_name").eq("id", user.id).single();
+    const { data } = await supabase
+      .from("hospitals")
+      .select("hospital_name")
+      .eq("id", user.id)
+      .single();
     if (data) setHospitalName(data.hospital_name);
   };
 
@@ -84,6 +88,7 @@ function HospitalDashboard() {
       .from("locum_duties")
       .select("*")
       .eq("hospital_id", user.id)
+      .eq("completed", false)
       .order("created_at", { ascending: false });
     if (!error) setDuties(data || []);
     setLoading(false);
@@ -104,10 +109,21 @@ function HospitalDashboard() {
       pay: parseFloat(form.pay),
       notes: form.notes,
       booked: false,
+      completed: false,
     });
+
     if (error) {
       alert("Error posting duty: " + error.message);
     } else {
+      // Send push notification to matching doctors
+      await supabase.functions.invoke("send-push", {
+        body: {
+          qualification: form.qualification,
+          title: "New Locum Duty Available!",
+          body: `A new ${form.qualification} duty is available on ${form.date}. ₹${form.pay}`,
+          url: "/doctor/dashboard",
+        },
+      });
       alert("Locum duty posted successfully!");
       setForm(emptyForm);
       setShowForm(false);
