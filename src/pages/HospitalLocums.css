@@ -34,17 +34,9 @@
   transition: 0.3s;
 }
 
-.header-buttons button:hover {
-  background: #16304d;
-}
-
-.header-buttons button.logout {
-  background: #e74c3c;
-}
-
-.header-buttons button.logout:hover {
-  background: #c0392b;
-}
+.header-buttons button:hover { background: #16304d; }
+.header-buttons button.logout { background: #e74c3c; }
+.header-buttons button.logout:hover { background: #c0392b; }
 
 .empty-state {
   text-align: center;
@@ -52,11 +44,7 @@
   color: #888;
 }
 
-.empty-state p {
-  font-size: 18px;
-  margin-bottom: 20px;
-}
-
+.empty-state p { font-size: 18px; margin-bottom: 20px; }
 .empty-state button {
   padding: 12px 28px;
   background: #1e3a5f;
@@ -80,9 +68,8 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
-.duty-card.booked {
-  border-left: 4px solid #27ae60;
-}
+.duty-card.booked { border-left: 4px solid #f39c12; }
+.duty-card.confirmed { border-left: 4px solid #27ae60; }
 
 .duty-header {
   display: flex;
@@ -92,11 +79,7 @@
   gap: 10px;
 }
 
-.duty-header h3 {
-  color: #1e3a5f;
-  font-size: 15px;
-  flex: 1;
-}
+.duty-header h3 { color: #1e3a5f; font-size: 15px; flex: 1; }
 
 .pay {
   background: #e8f5e9;
@@ -108,11 +91,7 @@
   white-space: nowrap;
 }
 
-.duty-details p {
-  color: #555;
-  font-size: 14px;
-  margin-bottom: 6px;
-}
+.duty-details p { color: #555; font-size: 14px; margin-bottom: 6px; }
 
 .status-badge {
   display: inline-block;
@@ -123,22 +102,75 @@
   font-weight: 600;
 }
 
-.status-open {
+.status-open { background: #e3f2fd; color: #1565c0; }
+.status-pending { background: #fff3e0; color: #e65100; }
+.status-confirmed { background: #e8f5e9; color: #2e7d32; }
+
+.doctor-details {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.doctor-details h4 {
+  color: #1e3a5f;
+  font-size: 14px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.doctor-details p {
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.view-doc-btn {
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
   background: #e3f2fd;
   color: #1565c0;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.3s;
 }
 
-.status-booked {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
+.view-doc-btn:hover { background: #bbdefb; }
 
-.booked-info {
+.action-buttons {
+  display: flex;
+  gap: 10px;
   margin-top: 12px;
 }
 
-.booked-by {
-  color: #555;
-  font-size: 14px;
-  margin-top: 6px;
+.verify-btn {
+  flex: 1;
+  padding: 10px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.3s;
 }
+
+.verify-btn:hover { background: #c8e6c9; }
+
+.reject-btn {
+  flex: 1;
+  padding: 10px;
+  background: #fce4ec;
+  color: #c62828;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.reject-btn:hover { background: #f8bbd0; }

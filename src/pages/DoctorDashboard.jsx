@@ -18,13 +18,11 @@ function DoctorDashboard() {
   const fetchDoctorData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-
     const { data: doctor } = await supabase
       .from("doctors")
       .select("first_name, last_name, qualification")
       .eq("id", user.id)
       .single();
-
     if (doctor) {
       setDoctorName(`${doctor.first_name} ${doctor.last_name}`);
       setDoctorQualification(doctor.qualification);
@@ -35,26 +33,20 @@ function DoctorDashboard() {
 
   const subscribeToPush = async (qualification) => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') return;
-
       const registration = await navigator.serviceWorker.ready;
-
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: 'BIRe1rpvBs-8IxaS8YG9dvCm5Jk-12bP2GTtan-lRPKH7JaDQUwSCjVB9-CdCBBb66jREzWif0NW7XSk0YRVl9o'
       });
-
       const { data: { user } } = await supabase.auth.getUser();
-
       await supabase.from('push_subscriptions').upsert({
         doctor_id: user.id,
         qualification: qualification,
         subscription: JSON.stringify(subscription),
       }, { onConflict: 'doctor_id' });
-
     } catch (err) {
       console.error('Push subscription error:', err);
     }
@@ -68,8 +60,8 @@ function DoctorDashboard() {
       .eq("qualification", qualification)
       .eq("booked", false)
       .eq("completed", false)
+      .eq("booking_status", "open")
       .order("date", { ascending: true });
-
     if (!error) setDuties(data || []);
     setLoading(false);
   };
@@ -79,37 +71,30 @@ function DoctorDashboard() {
       `Confirm booking at ${duty.hospitals?.hospital_name} on ${duty.date}?\n\nNote: Once booked, this cannot be cancelled.`
     );
     if (!confirmed) return;
-
     setBooking(duty.id);
-
     const { data: { user } } = await supabase.auth.getUser();
-
     const { data: latest } = await supabase
       .from("locum_duties")
-      .select("booked")
+      .select("booked, booking_status")
       .eq("id", duty.id)
       .single();
-
-    if (latest?.booked) {
+    if (latest?.booked || latest?.booking_status !== "open") {
       alert("Sorry, this duty was just booked by someone else!");
       setBooking(null);
       fetchDuties(doctorQualification);
       return;
     }
-
     const { error } = await supabase
       .from("locum_duties")
-      .update({ booked: true, booked_by: user.id })
+      .update({ booked: true, booked_by: user.id, booking_status: "pending_verification" })
       .eq("id", duty.id)
       .eq("booked", false);
-
     if (error) {
       alert("Error booking duty: " + error.message);
     } else {
-      alert("Booking confirmed! You will be notified with full details shortly.");
+      alert("Booking confirmed! The hospital will verify your credentials before the duty date.");
       fetchDuties(doctorQualification);
     }
-
     setBooking(null);
   };
 
@@ -134,9 +119,7 @@ function DoctorDashboard() {
 
       <h2>Available Locum Duties</h2>
       <p className="subtitle">
-        {doctorQualification
-          ? `Showing duties matching: ${doctorQualification}`
-          : "Loading your qualifications..."}
+        {doctorQualification ? `Showing duties matching: ${doctorQualification}` : "Loading..."}
       </p>
 
       {loading ? (

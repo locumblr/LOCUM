@@ -35,71 +35,38 @@ function AdminPanel() {
   const updateStatus = async (table, id, status) => {
     const { error } = await supabase.from(table).update({ status }).eq("id", id);
     if (error) { alert("Error: " + error.message); return; }
-
-    const record = table === "doctors"
-      ? doctors.find(d => d.id === id)
-      : hospitals.find(h => h.id === id);
-
-    const name = table === "doctors"
-      ? `Dr. ${record.first_name} ${record.last_name}`
-      : record.hospital_name;
-
-    if (status === "active") {
-      await supabase.functions.invoke("send-email", {
-        body: {
-          to: record.email,
-          subject: "Your LOCUM Account Has Been Approved!",
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
-              <h1 style="color: #1e3a5f;">LOCUM</h1>
-              <h2>Congratulations, ${name}!</h2>
-              <p>Your account has been verified and approved by our admin team.</p>
-              <p>You can now log in to the LOCUM platform and ${table === "doctors" ? "start browsing available locum duties." : "start posting locum duties."}</p>
-              <a href="http://localhost:5173/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a>
-              <p style="margin-top: 30px; color: #888; font-size: 13px;">If you have any questions, please contact our support team.</p>
-            </div>
-          `,
-        },
-      });
-    }
-
-    alert(`Account ${status === "active" ? "approved" : status === "frozen" ? "frozen" : status === "rejected" ? "rejected" : "updated"}!`);
+    alert(`Account ${status === "active" ? "activated" : status === "frozen" ? "frozen" : "updated"}!`);
     setSelected(null);
     fetchData();
   };
 
- const deleteAccount = async (table, id) => {
+  const clearFlag = async (id) => {
+    await supabase.from("doctors").update({ flagged: false, flag_reason: null, flagged_by: null }).eq("id", id);
+    fetchData();
+  };
+
+  const deleteAccount = async (table, id) => {
     const confirmed = window.confirm("Are you sure you want to permanently delete this account? This cannot be undone.\n\nActive duties will be deleted. Completed duties will be retained as records.");
     if (!confirmed) return;
-
-    // If deleting a hospital, delete only their active (incomplete) duties
     if (table === "hospitals") {
-      await supabase
-        .from("locum_duties")
-        .delete()
-        .eq("hospital_id", id)
-        .eq("completed", false);
+      await supabase.from("locum_duties").delete().eq("hospital_id", id).eq("completed", false);
     }
-
-    // If deleting a doctor, unbook their active bookings
     if (table === "doctors") {
-      await supabase
-        .from("locum_duties")
-        .update({ booked: false, booked_by: null })
-        .eq("booked_by", id)
-        .eq("completed", false);
+      await supabase.from("locum_duties").update({ booked: false, booked_by: null, booking_status: "open" }).eq("booked_by", id).eq("completed", false);
     }
-
-    // Delete from doctors/hospitals table
     const { error } = await supabase.from(table).delete().eq("id", id);
     if (error) { alert("Error deleting: " + error.message); return; }
-
-    // Also delete from auth
     await supabase.rpc("delete_user_account", { user_id: id });
-
     alert("Account deleted successfully!");
     setSelected(null);
     fetchData();
+  };
+
+  const viewDocument = async (documentUrl) => {
+    if (!documentUrl) { alert("No document uploaded."); return; }
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(documentUrl, 60);
+    if (error) { alert("Error: " + error.message); return; }
+    window.open(data.signedUrl, "_blank");
   };
 
   const logout = async () => {
@@ -107,37 +74,38 @@ function AdminPanel() {
     navigate("/");
   };
 
-  const pendingDoctors = doctors.filter(d => d.status === "pending");
-  const pendingHospitals = hospitals.filter(h => h.status === "pending");
+  const flaggedDoctors = doctors.filter(d => d.flagged);
+  const frozenDoctors = doctors.filter(d => d.status === "frozen");
+  const frozenHospitals = hospitals.filter(h => h.status === "frozen");
 
   return (
     <div className="admin-container">
       <div className="admin-header">
-  <h1>LOCUM Admin Panel</h1>
-  <div style={{ display: "flex", gap: 12 }}>
-    <button
-      style={{ padding: "10px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
-      onClick={() => navigate("/admin/records")}
-    >
-      Records
-    </button>
-    <button className="logout-btn" onClick={logout}>Logout</button>
-  </div>
-</div>
+        <h1>LOCUM Admin Panel</h1>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button style={{ padding: "10px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }} onClick={() => navigate("/admin/records")}>
+            Records
+          </button>
+          <button className="logout-btn" onClick={logout}>Logout</button>
+        </div>
+      </div>
 
       <div className="stats-row">
-        <div className="stat-card"><h3>{pendingDoctors.length}</h3><p>Pending Doctors</p></div>
-        <div className="stat-card"><h3>{pendingHospitals.length}</h3><p>Pending Hospitals</p></div>
-        <div className="stat-card green"><h3>{doctors.filter(d => d.status === "active").length}</h3><p>Active Doctors</p></div>
+        <div className="stat-card"><h3>{doctors.filter(d => d.status === "active").length}</h3><p>Active Doctors</p></div>
         <div className="stat-card green"><h3>{hospitals.filter(h => h.status === "active").length}</h3><p>Active Hospitals</p></div>
+        <div className="stat-card"><h3>{frozenDoctors.length + frozenHospitals.length}</h3><p>Frozen Accounts</p></div>
+        <div className="stat-card red"><h3>{flaggedDoctors.length}</h3><p>Flagged Doctors</p></div>
       </div>
 
       <div className="tabs">
         <button className={activeTab === "doctors" ? "active" : ""} onClick={() => setActiveTab("doctors")}>
-          Doctors {pendingDoctors.length > 0 && <span className="badge">{pendingDoctors.length}</span>}
+          Doctors
         </button>
         <button className={activeTab === "hospitals" ? "active" : ""} onClick={() => setActiveTab("hospitals")}>
-          Hospitals {pendingHospitals.length > 0 && <span className="badge">{pendingHospitals.length}</span>}
+          Hospitals
+        </button>
+        <button className={activeTab === "flagged" ? "active" : ""} onClick={() => setActiveTab("flagged")}>
+          Flagged {flaggedDoctors.length > 0 && <span className="badge" style={{ background: "#e74c3c" }}>{flaggedDoctors.length}</span>}
         </button>
       </div>
 
@@ -157,7 +125,7 @@ function AdminPanel() {
                   <tr><td colSpan="7" className="empty">No doctors registered yet</td></tr>
                 ) : doctors.map(doc => (
                   <tr key={doc.id}>
-                    <td>{doc.first_name} {doc.last_name}</td>
+                    <td>{doc.first_name} {doc.last_name} {doc.flagged && <span style={{ color: "#e74c3c", fontSize: 11 }}>⚑ Flagged</span>}</td>
                     <td>{doc.email}</td>
                     <td>{doc.phone}</td>
                     <td>{doc.qualification}</td>
@@ -165,16 +133,8 @@ function AdminPanel() {
                     <td><span className={`status-pill ${doc.status}`}>{doc.status}</span></td>
                     <td>
                       <button className="view-btn" onClick={() => setSelected({ ...doc, type: "doctor" })}>View</button>
-                      {doc.status === "pending" && <>
-                        <button className="approve-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Approve</button>
-                        <button className="reject-btn" onClick={() => updateStatus("doctors", doc.id, "rejected")}>Reject</button>
-                      </>}
-                      {doc.status === "active" && (
-                        <button className="freeze-btn" onClick={() => updateStatus("doctors", doc.id, "frozen")}>Freeze</button>
-                      )}
-                      {doc.status === "frozen" && (
-                        <button className="unfreeze-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Unfreeze</button>
-                      )}
+                      {doc.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("doctors", doc.id, "frozen")}>Freeze</button>}
+                      {doc.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Unfreeze</button>}
                       <button className="delete-btn" onClick={() => deleteAccount("doctors", doc.id)}>Delete</button>
                     </td>
                   </tr>
@@ -205,17 +165,41 @@ function AdminPanel() {
                     <td><span className={`status-pill ${hosp.status}`}>{hosp.status}</span></td>
                     <td>
                       <button className="view-btn" onClick={() => setSelected({ ...hosp, type: "hospital" })}>View</button>
-                      {hosp.status === "pending" && <>
-                        <button className="approve-btn" onClick={() => updateStatus("hospitals", hosp.id, "active")}>Approve</button>
-                        <button className="reject-btn" onClick={() => updateStatus("hospitals", hosp.id, "rejected")}>Reject</button>
-                      </>}
-                      {hosp.status === "active" && (
-                        <button className="freeze-btn" onClick={() => updateStatus("hospitals", hosp.id, "frozen")}>Freeze</button>
-                      )}
-                      {hosp.status === "frozen" && (
-                        <button className="unfreeze-btn" onClick={() => updateStatus("hospitals", hosp.id, "active")}>Unfreeze</button>
-                      )}
+                      {hosp.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("hospitals", hosp.id, "frozen")}>Freeze</button>}
+                      {hosp.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("hospitals", hosp.id, "active")}>Unfreeze</button>}
                       <button className="delete-btn" onClick={() => deleteAccount("hospitals", hosp.id)}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === "flagged" && (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th><th>Email</th><th>Phone</th>
+                  <th>Qualification</th><th>Flagged By</th>
+                  <th>Reason</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flaggedDoctors.length === 0 ? (
+                  <tr><td colSpan="7" className="empty">No flagged doctors</td></tr>
+                ) : flaggedDoctors.map(doc => (
+                  <tr key={doc.id} style={{ background: "#fff8f8" }}>
+                    <td>{doc.first_name} {doc.last_name}</td>
+                    <td>{doc.email}</td>
+                    <td>{doc.phone}</td>
+                    <td>{doc.qualification}</td>
+                    <td>{doc.flagged_by || "—"}</td>
+                    <td>{doc.flag_reason || "—"}</td>
+                    <td>
+                      <button className="view-btn" onClick={() => setSelected({ ...doc, type: "doctor" })}>View</button>
+                      <button className="approve-btn" onClick={() => clearFlag(doc.id)}>Clear Flag</button>
+                      <button className="freeze-btn" onClick={() => updateStatus("doctors", doc.id, "frozen")}>Freeze</button>
+                      <button className="delete-btn" onClick={() => deleteAccount("doctors", doc.id)}>Delete</button>
                     </td>
                   </tr>
                 ))}
@@ -228,15 +212,19 @@ function AdminPanel() {
       {selected && (
         <div className="modal-overlay" onClick={() => setSelected(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Application Details</h2>
+            <h2>Account Details</h2>
             <div className="detail-grid">
               {selected.type === "doctor" ? <>
-                <div><label>Name</label><p>{selected.first_name} {selected.last_name}</p></div>
+                <div><label>Name</label><p>Dr. {selected.first_name} {selected.last_name}</p></div>
                 <div><label>Email</label><p>{selected.email}</p></div>
                 <div><label>Phone</label><p>{selected.phone}</p></div>
-                <div><label>ID Number</label><p>{selected.id_number}</p></div>
                 <div><label>Qualification</label><p>{selected.qualification}</p></div>
                 <div><label>Experience</label><p>{selected.experience} years</p></div>
+                <div><label>Status</label><p>{selected.status}</p></div>
+                {selected.flagged && <>
+                  <div><label>Flagged By</label><p>{selected.flagged_by}</p></div>
+                  <div><label>Flag Reason</label><p>{selected.flag_reason}</p></div>
+                </>}
               </> : <>
                 <div><label>Hospital</label><p>{selected.hospital_name}</p></div>
                 <div><label>Email</label><p>{selected.email}</p></div>
@@ -244,32 +232,18 @@ function AdminPanel() {
                 <div><label>Address</label><p>{selected.address}</p></div>
                 <div><label>Reg. No.</label><p>{selected.registration_number}</p></div>
                 <div><label>Contact Person</label><p>{selected.contact_person}</p></div>
+                <div><label>Status</label><p>{selected.status}</p></div>
               </>}
-              <div><label>Status</label><p>{selected.status}</p></div>
-              <div><label>Applied On</label><p>{new Date(selected.created_at).toLocaleDateString()}</p></div>
-{selected.document_url && (
-  <div style={{ gridColumn: "1 / -1" }}>
-    <label>Submitted Document</label>
-    <button
-      onClick={async () => {
-        const { data } = await supabase.storage
-          .from("documents")
-          .createSignedUrl(selected.document_url, 60);
-        if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-      }}
-      style={{ padding: "8px 16px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer", marginTop: 6 }}
-    >
-      View Document
-    </button>
-  </div>
-)}
+              <div><label>Registered On</label><p>{new Date(selected.created_at).toLocaleDateString()}</p></div>
+              {selected.document_url && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label>Document</label>
+                  <button onClick={() => viewDocument(selected.document_url)} style={{ padding: "8px 16px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer", marginTop: 6 }}>
+                    📄 View Document
+                  </button>
+                </div>
+              )}
             </div>
-            {selected.status === "pending" && (
-              <div className="modal-actions">
-                <button className="approve-btn" onClick={() => updateStatus(selected.type === "doctor" ? "doctors" : "hospitals", selected.id, "active")}>Approve</button>
-                <button className="reject-btn" onClick={() => updateStatus(selected.type === "doctor" ? "doctors" : "hospitals", selected.id, "rejected")}>Reject</button>
-              </div>
-            )}
             {selected.status === "active" && (
               <div className="modal-actions">
                 <button className="freeze-btn" onClick={() => updateStatus(selected.type === "doctor" ? "doctors" : "hospitals", selected.id, "frozen")}>Freeze Account</button>
@@ -280,6 +254,11 @@ function AdminPanel() {
               <div className="modal-actions">
                 <button className="unfreeze-btn" onClick={() => updateStatus(selected.type === "doctor" ? "doctors" : "hospitals", selected.id, "active")}>Unfreeze Account</button>
                 <button className="delete-btn" onClick={() => deleteAccount(selected.type === "doctor" ? "doctors" : "hospitals", selected.id)}>Delete Account</button>
+              </div>
+            )}
+            {selected.flagged && (
+              <div className="modal-actions">
+                <button className="approve-btn" onClick={() => clearFlag(selected.id)}>Clear Flag</button>
               </div>
             )}
             <button className="close-btn" onClick={() => setSelected(null)}>Close</button>
