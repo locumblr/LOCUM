@@ -247,6 +247,22 @@ function AdminPanel() {
               </>}
               <div><label>Status</label><p>{selected.status}</p></div>
               <div><label>Applied On</label><p>{new Date(selected.created_at).toLocaleDateString()}</p></div>
+{selected.document_url && (
+  <div style={{ gridColumn: "1 / -1" }}>
+    <label>Submitted Document</label>
+    <button
+      onClick={async () => {
+        const { data } = await supabase.storage
+          .from("documents")
+          .createSignedUrl(selected.document_url, 60);
+        if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+      }}
+      style={{ padding: "8px 16px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer", marginTop: 6 }}
+    >
+      View Document
+    </button>
+  </div>
+)}
             </div>
             {selected.status === "pending" && (
               <div className="modal-actions">

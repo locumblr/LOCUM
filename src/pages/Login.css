@@ -1,6 +1,6 @@
 .login-container {
   max-width: 420px;
-  margin: 80px auto;
+  margin: 60px auto;
   padding: 40px;
   text-align: center;
   background: white;
@@ -8,10 +8,9 @@
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
 
-.login-container h1 {
-  color: #1e3a5f;
-  font-size: 42px;
-  margin-bottom: 8px;
+.login-logo {
+  width: 160px;
+  margin-bottom: 16px;
 }
 
 .login-container p {
@@ -55,8 +54,15 @@
   cursor: not-allowed;
 }
 
+.forgot-link {
+  color: #1e3a5f;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
 .switch-link {
-  margin-top: 24px;
+  margin-top: 12px;
   font-size: 14px;
   color: #555;
 }
@@ -75,4 +81,13 @@
   font-size: 14px;
   margin-bottom: 12px;
   text-align: left;
+}
+
+.success-msg {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 12px;
 }

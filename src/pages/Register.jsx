@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import "./Register.css";
+import logo from "../assets/logo.png";
 
 function Register() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ function Register() {
 
   return (
     <div className="register-container">
+      <img src={logo} alt="LOCUM" className="register-logo" />
       <h1>Create Account</h1>
       <p>Register as a Doctor or Hospital</p>
 
@@ -23,9 +25,7 @@ function Register() {
       {role === "hospital" && <HospitalForm navigate={navigate} />}
 
       {role && (
-        <p className="back-link" onClick={() => setRole(null)}>
-          ← Go back
-        </p>
+        <p className="back-link" onClick={() => setRole(null)}>← Go back</p>
       )}
 
       <p className="switch-link">
@@ -39,7 +39,7 @@ function Register() {
 function DoctorForm({ navigate }) {
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
-    qualification: "", experience: "", idNumber: "",
+    qualification: "", experience: "",
     password: "", confirmPassword: "",
   });
   const [certificate, setCertificate] = useState(null);
@@ -98,44 +98,45 @@ function DoctorForm({ navigate }) {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match!");
-      return;
-    }
-
+    if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
+    if (!certificate) { setError("Please upload your certificate."); return; }
     setLoading(true);
 
     try {
-      // Create auth account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
-        options: {
-          data: { role: "doctor" }
-        }
+        options: { data: { role: "doctor" } }
       });
-
       if (authError) throw authError;
 
-      // Save doctor details to doctors table
+      // Upload certificate
+      const fileExt = certificate.name.split('.').pop();
+      const fileName = `doctors/${authData.user.id}/certificate.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(fileName, certificate);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("documents")
+        .getPublicUrl(fileName);
+
       const { error: dbError } = await supabase.from("doctors").insert({
         id: authData.user.id,
         first_name: form.firstName,
         last_name: form.lastName,
         email: form.email,
         phone: form.phone,
-        id_number: form.idNumber,
         qualification: form.qualification,
         experience: parseInt(form.experience),
+        document_url: fileName,
         status: "pending",
       });
-
       if (dbError) throw dbError;
 
-      alert("Application submitted successfully! You will receive an email once your account is verified by our admin team.");
+      alert("Application submitted successfully! You will receive an email once your account is verified.");
       navigate("/");
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -146,17 +147,14 @@ function DoctorForm({ navigate }) {
   return (
     <form onSubmit={submit} className="register-form">
       <h2>Doctor Registration</h2>
-
       {error && <p className="error-msg">{error}</p>}
 
       <div className="form-row">
         <input name="firstName" placeholder="First Name" required onChange={handle} />
         <input name="lastName" placeholder="Last Name" required onChange={handle} />
       </div>
-
       <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
       <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
-      <input name="idNumber" placeholder="ID / Passport Number" required onChange={handle} />
 
       <select name="qualification" required onChange={handle} defaultValue="">
         <option value="" disabled>Select Your Qualification</option>
@@ -188,6 +186,7 @@ function HospitalForm({ navigate }) {
     address: "", registrationNumber: "",
     contactPerson: "", password: "", confirmPassword: "",
   });
+  const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -196,27 +195,26 @@ function HospitalForm({ navigate }) {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match!");
-      return;
-    }
-
+    if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
+    if (!document) { setError("Please upload your registration certificate."); return; }
     setLoading(true);
 
     try {
-      // Create auth account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
-        options: {
-          data: { role: "hospital" }
-        }
+        options: { data: { role: "hospital" } }
       });
-
       if (authError) throw authError;
 
-      // Save hospital details to hospitals table
+      // Upload document
+      const fileExt = document.name.split('.').pop();
+      const fileName = `hospitals/${authData.user.id}/certificate.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(fileName, document);
+      if (uploadError) throw uploadError;
+
       const { error: dbError } = await supabase.from("hospitals").insert({
         id: authData.user.id,
         hospital_name: form.hospitalName,
@@ -225,14 +223,13 @@ function HospitalForm({ navigate }) {
         address: form.address,
         registration_number: form.registrationNumber,
         contact_person: form.contactPerson,
+        document_url: fileName,
         status: "pending",
       });
-
       if (dbError) throw dbError;
 
-      alert("Application submitted successfully! You will receive an email once your account is verified by our admin team.");
+      alert("Application submitted successfully! You will receive an email once your account is verified.");
       navigate("/");
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -243,7 +240,6 @@ function HospitalForm({ navigate }) {
   return (
     <form onSubmit={submit} className="register-form">
       <h2>Hospital Registration</h2>
-
       {error && <p className="error-msg">{error}</p>}
 
       <input name="hospitalName" placeholder="Hospital / Clinic Name" required onChange={handle} />
@@ -255,7 +251,7 @@ function HospitalForm({ navigate }) {
 
       <label className="file-label">
         Upload Registration Certificate
-        <input type="file" accept=".pdf,.jpg,.png" required />
+        <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setDocument(e.target.files[0])} required />
       </label>
 
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />

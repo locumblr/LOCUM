@@ -1,14 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import "../App.css";
+import logo from "../assets/logo.png";
 
 function Home() {
   const navigate = useNavigate();
 
   return (
     <div className="container">
-      <h1>LOCUM</h1>
+      <img src={logo} alt="LOCUM" style={{ width: 200, marginBottom: 20 }} />
       <p>Connecting Hospitals & Freelance Doctors</p>
-
       <div className="button-group">
         <button onClick={() => navigate("/login")}>Login</button>
         <button onClick={() => navigate("/register")}>Register</button>
