@@ -8,7 +8,6 @@ function Home() {
   return (
     <div className="container">
       <img src={logo} alt="LOCUM" style={{ width: 200, marginBottom: 20 }} />
-      <p>Connecting Hospitals & Freelance Doctors</p>
       <div className="button-group">
         <button onClick={() => navigate("/login")}>Login</button>
         <button onClick={() => navigate("/register")}>Register</button>
