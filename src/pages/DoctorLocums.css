@@ -34,17 +34,9 @@
   transition: 0.3s;
 }
 
-.header-buttons button:hover {
-  background: #16304d;
-}
-
-.header-buttons button.logout {
-  background: #e74c3c;
-}
-
-.header-buttons button.logout:hover {
-  background: #c0392b;
-}
+.header-buttons button:hover { background: #16304d; }
+.header-buttons button.logout { background: #e74c3c; }
+.header-buttons button.logout:hover { background: #c0392b; }
 
 .empty-state {
   text-align: center;
@@ -68,10 +60,6 @@
   transition: 0.3s;
 }
 
-.empty-state button:hover {
-  background: #16304d;
-}
-
 .duties-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -83,6 +71,14 @@
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.duty-card.confirmed {
+  border-left: 4px solid #27ae60;
+}
+
+.duty-card.pending-card {
+  border-left: 4px solid #f39c12;
 }
 
 .duty-header {
@@ -124,4 +120,16 @@
 .confirmed {
   background: #e8f5e9;
   color: #2e7d32;
+}
+
+.pending {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.verification-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
 }
