@@ -1,14 +1,143 @@
+.register-container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 30px 20px;
+  text-align: center;
+}
+
 .register-logo {
   width: 160px;
-  margin-bottom: 16px;
+  margin: 0 auto 20px auto;
+  display: block;
+}
+
+.register-container h1 {
+  color: #1e3a5f;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.register-container p {
+  color: #555;
+  margin-bottom: 24px;
+  font-size: 16px;
+}
+
+.role-select {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.role-select button {
+  width: 100%;
+  padding: 18px;
+  font-size: 18px;
+  border: none;
+  border-radius: 12px;
+  background-color: #1e3a5f;
+  color: white;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.role-select button:hover {
+  background-color: #16304d;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  margin-top: 20px;
+}
+
+.register-form h2 {
+  color: #1e3a5f;
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 24px;
+}
+
+.register-form input,
+.register-form select {
+  padding: 14px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  background: white;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.file-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: #555;
+  background: #f5f7fa;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px dashed #ccc;
+}
+
+.register-form button[type="submit"] {
+  padding: 16px;
+  background-color: #1e3a5f;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: 0.3s;
+  width: 100%;
+}
+
+.register-form button[type="submit"]:hover {
+  background-color: #16304d;
+}
+
+.register-form button:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
+}
+
+.back-link {
+  color: #1e3a5f;
+  cursor: pointer;
+  margin-top: 16px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.switch-link {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #555;
+  text-align: center;
+}
+
+.switch-link span {
+  color: #1e3a5f;
+  cursor: pointer;
+  font-weight: bold;
 }
 
 .error-msg {
   background: #fce4ec;
   color: #c62828;
-  padding: 10px 16px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
   font-size: 14px;
-  margin-bottom: 12px;
-  text-align: left;
+  text-align: center;
 }
