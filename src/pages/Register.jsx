@@ -131,7 +131,7 @@ function DoctorForm({ navigate }) {
         qualification: form.qualification,
         experience: parseInt(form.experience),
         document_url: fileName,
-        status: "pending",
+        status: "active",
       });
       if (dbError) throw dbError;
 
@@ -224,11 +224,11 @@ function HospitalForm({ navigate }) {
         registration_number: form.registrationNumber,
         contact_person: form.contactPerson,
         document_url: fileName,
-        status: "pending",
+        status: "active",
       });
       if (dbError) throw dbError;
 
-      alert("Application submitted successfully! You will receive an email once your account is verified.");
+      alert("Registration successful! You can now log in to your account.");
       navigate("/");
     } catch (err) {
       setError(err.message);
