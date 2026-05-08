@@ -7,4 +7,161 @@
 body {
   font-family: Arial, sans-serif;
   background-color: #f4f7fb;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Make all containers responsive */
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Global responsive fixes */
+input, select, textarea, button {
+  font-family: Arial, sans-serif;
+  font-size: 16px !important; /* Prevents zoom on iOS */
+}
+
+/* Scrollable pages on mobile */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Fix for mobile padding */
+@media (max-width: 768px) {
+  .dashboard-container,
+  .locums-container,
+  .records-container,
+  .admin-container,
+  .profile-container {
+    padding: 16px !important;
+  }
+
+  .dashboard-header,
+  .locums-header,
+  .records-header,
+  .admin-header,
+  .profile-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .header-buttons {
+    width: 100%;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .header-buttons button {
+    flex: 1 !important;
+    padding: 10px 8px !important;
+    font-size: 13px !important;
+    min-width: 80px !important;
+  }
+
+  .duties-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .form-row {
+    flex-direction: column !important;
+  }
+
+  .tabs {
+    width: 100% !important;
+  }
+
+  .tabs button {
+    font-size: 13px !important;
+    padding: 8px 12px !important;
+  }
+
+  .admin-table {
+    font-size: 12px !important;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 8px !important;
+  }
+
+  .records-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .search-input {
+    width: 100% !important;
+  }
+
+  .filter-tabs {
+    width: 100% !important;
+    justify-content: stretch !important;
+  }
+
+  .filter-tabs button {
+    flex: 1 !important;
+    font-size: 12px !important;
+    padding: 8px 4px !important;
+  }
+
+  .modal {
+    width: 95% !important;
+    padding: 20px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .role-select {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  .role-select button {
+    width: 100% !important;
+  }
+
+  .duty-card {
+    padding: 16px !important;
+  }
+
+  .profile-card {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  .login-container {
+    margin: 20px auto !important;
+    padding: 24px !important;
+  }
+
+  .register-container {
+    padding: 16px !important;
+    margin: 16px auto !important;
+  }
+
+  h1 {
+    font-size: 24px !important;
+  }
+
+  h2 {
+    font-size: 20px !important;
+  }
 }
