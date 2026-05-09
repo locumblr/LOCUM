@@ -45,6 +45,7 @@ function DoctorForm({ navigate }) {
   const [certificate, setCertificate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [agreed, setAgreed] = useState(false);
 
   const qualifications = [
     "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
@@ -98,6 +99,7 @@ function DoctorForm({ navigate }) {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!agreed) { setError("You must agree to the Terms of Service and Privacy Policy to continue."); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
     if (!certificate) { setError("Please upload your certificate."); return; }
     setLoading(true);
@@ -110,17 +112,12 @@ function DoctorForm({ navigate }) {
       });
       if (authError) throw authError;
 
-      // Upload certificate
       const fileExt = certificate.name.split('.').pop();
       const fileName = `doctors/${authData.user.id}/certificate.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from("documents")
         .upload(fileName, certificate);
       if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("documents")
-        .getPublicUrl(fileName);
 
       const { error: dbError } = await supabase.from("doctors").insert({
         id: authData.user.id,
@@ -135,8 +132,8 @@ function DoctorForm({ navigate }) {
       });
       if (dbError) throw dbError;
 
-      alert("Application submitted successfully! You will receive an email once your account is verified.");
-      navigate("/");
+      alert("Registration successful! You can now log in to your account.");
+      navigate("/login");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -173,8 +170,22 @@ function DoctorForm({ navigate }) {
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
 
-      <button type="submit" disabled={loading}>
-        {loading ? "Submitting..." : "Submit Application"}
+      <label className="terms-checkbox">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+        />
+        <span>
+          I agree to the{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+          {" "}and{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        </span>
+      </label>
+
+      <button type="submit" disabled={loading || !agreed}>
+        {loading ? "Submitting..." : "Create Account"}
       </button>
     </form>
   );
@@ -189,12 +200,14 @@ function HospitalForm({ navigate }) {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [agreed, setAgreed] = useState(false);
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!agreed) { setError("You must agree to the Terms of Service and Privacy Policy to continue."); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
     if (!document) { setError("Please upload your registration certificate."); return; }
     setLoading(true);
@@ -207,7 +220,6 @@ function HospitalForm({ navigate }) {
       });
       if (authError) throw authError;
 
-      // Upload document
       const fileExt = document.name.split('.').pop();
       const fileName = `hospitals/${authData.user.id}/certificate.${fileExt}`;
       const { error: uploadError } = await supabase.storage
@@ -224,11 +236,11 @@ function HospitalForm({ navigate }) {
         registration_number: form.registrationNumber,
         contact_person: form.contactPerson,
         document_url: fileName,
-        status: "active",
+        status: "pending",
       });
       if (dbError) throw dbError;
 
-      alert("Registration successful! You can now log in to your account.");
+      alert("Application submitted! Our team will review your registration and notify you once approved.");
       navigate("/");
     } catch (err) {
       setError(err.message);
@@ -257,7 +269,21 @@ function HospitalForm({ navigate }) {
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
 
-      <button type="submit" disabled={loading}>
+      <label className="terms-checkbox">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+        />
+        <span>
+          I agree to the{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+          {" "}and{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        </span>
+      </label>
+
+      <button type="submit" disabled={loading || !agreed}>
         {loading ? "Submitting..." : "Submit Application"}
       </button>
     </form>

@@ -172,6 +172,7 @@ function DoctorDashboard() {
         <div className="header-buttons">
           <button onClick={() => navigate("/doctor/locums")}>My Locums</button>
           <button onClick={() => navigate("/doctor/profile")}>Profile</button>
+          <button onClick={() => navigate("/help")}>Help</button>
           <button className="logout" onClick={logout}>Logout</button>
         </div>
       </div>

@@ -1,0 +1,145 @@
+.help-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+.help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.help-logo {
+  width: 100px;
+  cursor: pointer;
+}
+
+.back-btn {
+  padding: 10px 20px;
+  background: #1e3a5f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.help-container h1 {
+  color: #1e3a5f;
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.help-subtitle {
+  color: #888;
+  font-size: 15px;
+  margin-bottom: 24px;
+}
+
+.help-contact-cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.help-contact-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f0f4f8;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #1e3a5f;
+  font-weight: 600;
+}
+
+.help-contact-card span {
+  font-size: 20px;
+}
+
+.help-form {
+  background: white;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.help-form-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.help-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.help-form-group label {
+  font-size: 14px;
+  color: #555;
+  font-weight: 600;
+}
+
+.help-form-group input,
+.help-form-group select,
+.help-form-group textarea {
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  font-family: Arial, sans-serif;
+}
+
+.help-form-group textarea { resize: vertical; }
+
+.help-submit-btn {
+  padding: 14px;
+  background: #1e3a5f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.help-submit-btn:hover { background: #16304d; }
+.help-submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+.help-success {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.help-success h2 { color: #1e3a5f; margin-bottom: 12px; }
+.help-success p { color: #555; margin-bottom: 24px; }
+.help-success button {
+  padding: 12px 28px;
+  background: #1e3a5f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .help-form-row { flex-direction: column !important; }
+  .help-form { padding: 16px !important; }
+}

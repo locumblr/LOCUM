@@ -184,6 +184,7 @@ function HospitalDashboard() {
           </button>
           <button onClick={() => navigate("/hospital/locums")}>My Locums</button>
           <button onClick={() => navigate("/hospital/profile")}>Profile</button>
+          <button onClick={() => navigate("/help")}>Help</button>
           <button className="logout" onClick={logout}>Logout</button>
         </div>
       </div>
