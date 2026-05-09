@@ -7,6 +7,7 @@
 .stat-card h3 { font-size: 36px; color: #1e3a5f; margin-bottom: 4px; }
 .stat-card.green h3 { color: #27ae60; }
 .stat-card.red h3 { color: #e74c3c; }
+.stat-card.orange h3 { color: #e65100; }
 .stat-card p { color: #888; font-size: 14px; }
 .tabs { display: flex; gap: 4px; background: #f0f4f8; border-radius: 10px; padding: 4px; margin-bottom: 24px; flex-wrap: wrap; }
 .tabs button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; background: transparent; color: #555; font-size: 14px; display: flex; align-items: center; gap: 8px; }
@@ -21,9 +22,11 @@
 .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
 .status-pill.active { background: #e8f5e9; color: #2e7d32; }
 .status-pill.frozen { background: #e3f2fd; color: #1565c0; }
+.status-pill.pending { background: #fff3e0; color: #e65100; }
 .status-pill.rejected { background: #fce4ec; color: #c62828; }
 .view-btn { padding: 6px 12px; background: #e3f2fd; color: #1565c0; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
 .approve-btn { padding: 6px 12px; background: #e8f5e9; color: #2e7d32; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+.reject-btn { padding: 6px 12px; background: #fce4ec; color: #c62828; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
 .freeze-btn { padding: 6px 12px; background: #fff3e0; color: #e65100; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
 .unfreeze-btn { padding: 6px 12px; background: #e8f5e9; color: #2e7d32; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px; }
 .delete-btn { padding: 6px 12px; background: #fce4ec; color: #c62828; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
@@ -38,8 +41,6 @@
 .close-btn { width: 100%; padding: 12px; background: #f0f4f8; color: #555; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
 .loading { text-align: center; color: #888; padding: 40px; }
 .empty { text-align: center; color: #888; padding: 40px; }
-
-/* Billing styles */
 .billing-section { padding: 4px; }
 .billing-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px; }
 .billing-stat { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }

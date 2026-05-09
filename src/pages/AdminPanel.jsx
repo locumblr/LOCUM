@@ -57,7 +57,31 @@ function AdminPanel() {
   const updateStatus = async (table, id, status) => {
     const { error } = await supabase.from(table).update({ status }).eq("id", id);
     if (error) { alert("Error: " + error.message); return; }
-    alert(`Account ${status === "active" ? "activated" : status === "frozen" ? "frozen" : "updated"}!`);
+
+    // Send approval email if hospital is being approved
+    if (table === "hospitals" && status === "active") {
+      const hospital = hospitals.find(h => h.id === id);
+      if (hospital) {
+        await supabase.functions.invoke("send-email", {
+          body: {
+            to: hospital.email,
+            subject: "Your LOCUM Hospital Account Has Been Approved!",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+                <h1 style="color: #1e3a5f;">LOCUM</h1>
+                <h2>Congratulations, ${hospital.hospital_name}!</h2>
+                <p>Your hospital account has been verified and approved by our admin team.</p>
+                <p>You can now log in to the LOCUM platform and start posting locum duties.</p>
+                <a href="https://project-1qlxe.vercel.app/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a>
+                <p style="margin-top: 30px; color: #888; font-size: 13px;">If you have any questions, please contact us at locum.blr@gmail.com</p>
+              </div>
+            `,
+          },
+        });
+      }
+    }
+
+    alert(`Account ${status === "active" ? "approved" : status === "frozen" ? "frozen" : status === "rejected" ? "rejected" : "updated"}!`);
     setSelected(null);
     fetchData();
   };
@@ -99,20 +123,16 @@ function AdminPanel() {
   const flaggedDoctors = doctors.filter(d => d.flagged);
   const frozenDoctors = doctors.filter(d => d.status === "frozen");
   const frozenHospitals = hospitals.filter(h => h.status === "frozen");
+  const pendingHospitals = hospitals.filter(h => h.status === "pending");
 
   const totalOwed = billing.filter(d => d.payment_status !== "paid").reduce((sum, d) => sum + (d.platform_fee || 0), 0);
   const totalPaid = billing.filter(d => d.payment_status === "paid").reduce((sum, d) => sum + (d.platform_fee || 0), 0);
 
-  // Group unpaid billing by hospital
   const billingByHospital = billing.reduce((acc, duty) => {
     if (duty.payment_status === "paid") return acc;
     const hospitalName = duty.hospitals?.hospital_name || "Unknown";
     if (!acc[hospitalName]) {
-      acc[hospitalName] = {
-        hospital: duty.hospitals,
-        duties: [],
-        total: 0,
-      };
+      acc[hospitalName] = { hospital: duty.hospitals, duties: [], total: 0 };
     }
     acc[hospitalName].duties.push(duty);
     acc[hospitalName].total += duty.platform_fee || 0;
@@ -134,13 +154,17 @@ function AdminPanel() {
       <div className="stats-row">
         <div className="stat-card"><h3>{doctors.filter(d => d.status === "active").length}</h3><p>Active Doctors</p></div>
         <div className="stat-card green"><h3>{hospitals.filter(h => h.status === "active").length}</h3><p>Active Hospitals</p></div>
-        <div className="stat-card"><h3>{frozenDoctors.length + frozenHospitals.length}</h3><p>Frozen Accounts</p></div>
+        <div className="stat-card orange"><h3>{pendingHospitals.length}</h3><p>Pending Hospitals</p></div>
         <div className="stat-card red"><h3>{flaggedDoctors.length}</h3><p>Flagged Doctors</p></div>
       </div>
 
       <div className="tabs">
-        <button className={activeTab === "doctors" ? "active" : ""} onClick={() => setActiveTab("doctors")}>Doctors</button>
-        <button className={activeTab === "hospitals" ? "active" : ""} onClick={() => setActiveTab("hospitals")}>Hospitals</button>
+        <button className={activeTab === "doctors" ? "active" : ""} onClick={() => setActiveTab("doctors")}>
+          Doctors
+        </button>
+        <button className={activeTab === "hospitals" ? "active" : ""} onClick={() => setActiveTab("hospitals")}>
+          Hospitals {pendingHospitals.length > 0 && <span className="badge">{pendingHospitals.length}</span>}
+        </button>
         <button className={activeTab === "flagged" ? "active" : ""} onClick={() => setActiveTab("flagged")}>
           Flagged {flaggedDoctors.length > 0 && <span className="badge" style={{ background: "#e74c3c" }}>{flaggedDoctors.length}</span>}
         </button>
@@ -197,7 +221,7 @@ function AdminPanel() {
                 {hospitals.length === 0 ? (
                   <tr><td colSpan="7" className="empty">No hospitals registered yet</td></tr>
                 ) : hospitals.map(hosp => (
-                  <tr key={hosp.id}>
+                  <tr key={hosp.id} style={{ background: hosp.status === "pending" ? "#fffbf0" : "white" }}>
                     <td>{hosp.hospital_name}</td>
                     <td>{hosp.email}</td>
                     <td>{hosp.phone}</td>
@@ -206,6 +230,10 @@ function AdminPanel() {
                     <td><span className={`status-pill ${hosp.status}`}>{hosp.status}</span></td>
                     <td>
                       <button className="view-btn" onClick={() => setSelected({ ...hosp, type: "hospital" })}>View</button>
+                      {hosp.status === "pending" && <>
+                        <button className="approve-btn" onClick={() => updateStatus("hospitals", hosp.id, "active")}>Approve</button>
+                        <button className="reject-btn" onClick={() => updateStatus("hospitals", hosp.id, "rejected")}>Reject</button>
+                      </>}
                       {hosp.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("hospitals", hosp.id, "frozen")}>Freeze</button>}
                       {hosp.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("hospitals", hosp.id, "active")}>Unfreeze</button>}
                       <button className="delete-btn" onClick={() => deleteAccount("hospitals", hosp.id)}>Delete</button>
@@ -310,9 +338,7 @@ function AdminPanel() {
                                 </td>
                                 <td>
                                   {duty.payment_status !== "paid" && (
-                                    <button className="mark-paid-btn" onClick={() => markAsPaid(duty.id)}>
-                                      Mark Paid
-                                    </button>
+                                    <button className="mark-paid-btn" onClick={() => markAsPaid(duty.id)}>Mark Paid</button>
                                   )}
                                   {duty.payment_status === "paid" && (
                                     <span style={{ fontSize: 12, color: "#888" }}>
@@ -399,6 +425,13 @@ function AdminPanel() {
                 </div>
               )}
             </div>
+            {selected.status === "pending" && selected.type === "hospital" && (
+              <div className="modal-actions">
+                <button className="approve-btn" onClick={() => updateStatus("hospitals", selected.id, "active")}>Approve</button>
+                <button className="reject-btn" onClick={() => updateStatus("hospitals", selected.id, "rejected")}>Reject</button>
+                <button className="delete-btn" onClick={() => deleteAccount("hospitals", selected.id)}>Delete</button>
+              </div>
+            )}
             {selected.status === "active" && (
               <div className="modal-actions">
                 <button className="freeze-btn" onClick={() => updateStatus(selected.type === "doctor" ? "doctors" : "hospitals", selected.id, "frozen")}>Freeze Account</button>
