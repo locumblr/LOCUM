@@ -150,7 +150,7 @@ function Terms() {
 
         <section>
           <h2>13. Contact</h2>
-          <p>For any questions regarding these Terms, please contact us at: <strong>legal@locumblr.in</strong></p>
+          <p>For any questions regarding these Terms, please contact us at: <strong>locum.blr@gmail.com</strong></p>
         </section>
       </div>
     </div>
