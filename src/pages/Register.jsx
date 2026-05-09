@@ -170,7 +170,7 @@ function DoctorForm({ navigate }) {
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
 
-      <<div className="terms-checkbox">
+      <div className="terms-checkbox">
         <input
           type="checkbox"
           checked={agreed}
@@ -269,7 +269,7 @@ function HospitalForm({ navigate }) {
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
 
-      <<div className="terms-checkbox">
+      <div className="terms-checkbox">
         <input
           type="checkbox"
           checked={agreed}
