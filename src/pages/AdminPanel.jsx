@@ -10,6 +10,8 @@ function AdminPanel() {
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [billing, setBilling] = useState([]);
+  const [billingLoading, setBillingLoading] = useState(false);
 
   useEffect(() => {
     checkAdmin();
@@ -30,6 +32,26 @@ function AdminPanel() {
     setDoctors(doc || []);
     setHospitals(hosp || []);
     setLoading(false);
+  };
+
+  const fetchBilling = async () => {
+    setBillingLoading(true);
+    const { data, error } = await supabase
+      .from("locum_duties")
+      .select("*, hospitals(hospital_name, email, phone), doctors(first_name, last_name)")
+      .eq("booked", true)
+      .order("date", { ascending: false });
+    if (!error) setBilling(data || []);
+    setBillingLoading(false);
+  };
+
+  const markAsPaid = async (dutyId) => {
+    const { error } = await supabase
+      .from("locum_duties")
+      .update({ payment_status: "paid", payment_cleared_at: new Date().toISOString() })
+      .eq("id", dutyId);
+    if (error) { alert("Error: " + error.message); return; }
+    fetchBilling();
   };
 
   const updateStatus = async (table, id, status) => {
@@ -78,6 +100,25 @@ function AdminPanel() {
   const frozenDoctors = doctors.filter(d => d.status === "frozen");
   const frozenHospitals = hospitals.filter(h => h.status === "frozen");
 
+  const totalOwed = billing.filter(d => d.payment_status !== "paid").reduce((sum, d) => sum + (d.platform_fee || 0), 0);
+  const totalPaid = billing.filter(d => d.payment_status === "paid").reduce((sum, d) => sum + (d.platform_fee || 0), 0);
+
+  // Group unpaid billing by hospital
+  const billingByHospital = billing.reduce((acc, duty) => {
+    if (duty.payment_status === "paid") return acc;
+    const hospitalName = duty.hospitals?.hospital_name || "Unknown";
+    if (!acc[hospitalName]) {
+      acc[hospitalName] = {
+        hospital: duty.hospitals,
+        duties: [],
+        total: 0,
+      };
+    }
+    acc[hospitalName].duties.push(duty);
+    acc[hospitalName].total += duty.platform_fee || 0;
+    return acc;
+  }, {});
+
   return (
     <div className="admin-container">
       <div className="admin-header">
@@ -98,19 +139,19 @@ function AdminPanel() {
       </div>
 
       <div className="tabs">
-        <button className={activeTab === "doctors" ? "active" : ""} onClick={() => setActiveTab("doctors")}>
-          Doctors
-        </button>
-        <button className={activeTab === "hospitals" ? "active" : ""} onClick={() => setActiveTab("hospitals")}>
-          Hospitals
-        </button>
+        <button className={activeTab === "doctors" ? "active" : ""} onClick={() => setActiveTab("doctors")}>Doctors</button>
+        <button className={activeTab === "hospitals" ? "active" : ""} onClick={() => setActiveTab("hospitals")}>Hospitals</button>
         <button className={activeTab === "flagged" ? "active" : ""} onClick={() => setActiveTab("flagged")}>
           Flagged {flaggedDoctors.length > 0 && <span className="badge" style={{ background: "#e74c3c" }}>{flaggedDoctors.length}</span>}
         </button>
+        <button className={activeTab === "billing" ? "active" : ""} onClick={() => { setActiveTab("billing"); fetchBilling(); }}>
+          💰 Billing
+        </button>
       </div>
 
-      {loading ? <p className="loading">Loading...</p> : (
+      {loading && activeTab !== "billing" ? <p className="loading">Loading...</p> : (
         <div className="table-container">
+
           {activeTab === "doctors" && (
             <table className="admin-table">
               <thead>
@@ -205,6 +246,120 @@ function AdminPanel() {
                 ))}
               </tbody>
             </table>
+          )}
+
+          {activeTab === "billing" && (
+            <div className="billing-section">
+              <div className="billing-stats">
+                <div className="billing-stat unpaid">
+                  <h3>₹{totalOwed.toLocaleString()}</h3>
+                  <p>Total Outstanding</p>
+                </div>
+                <div className="billing-stat paid">
+                  <h3>₹{totalPaid.toLocaleString()}</h3>
+                  <p>Total Collected</p>
+                </div>
+                <div className="billing-stat total">
+                  <h3>{billing.filter(d => d.payment_status !== "paid").length}</h3>
+                  <p>Unpaid Duties</p>
+                </div>
+              </div>
+
+              {billingLoading ? <p className="loading">Loading billing data...</p> : (
+                <>
+                  <h3 style={{ color: "#1e3a5f", marginBottom: 16 }}>Outstanding Dues by Hospital</h3>
+                  {Object.keys(billingByHospital).length === 0 ? (
+                    <p className="empty">No outstanding dues!</p>
+                  ) : (
+                    Object.entries(billingByHospital).map(([hospitalName, data]) => (
+                      <div key={hospitalName} className="hospital-billing-card">
+                        <div className="hospital-billing-header">
+                          <div>
+                            <h4>{hospitalName}</h4>
+                            <p>📞 {data.hospital?.phone} | ✉️ {data.hospital?.email}</p>
+                          </div>
+                          <div className="hospital-billing-total">
+                            <span>Total Owed</span>
+                            <strong>₹{data.total.toLocaleString()}</strong>
+                          </div>
+                        </div>
+                        <table className="billing-table">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Doctor</th>
+                              <th>Gross Pay</th>
+                              <th>Doctor Pay (80%)</th>
+                              <th>Our Fee (20%)</th>
+                              <th>Status</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.duties.map(duty => (
+                              <tr key={duty.id}>
+                                <td>{duty.date}</td>
+                                <td>{duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—"}</td>
+                                <td>₹{(duty.gross_pay || duty.pay || 0).toLocaleString()}</td>
+                                <td>₹{(duty.doctor_pay || 0).toLocaleString()}</td>
+                                <td>₹{(duty.platform_fee || 0).toLocaleString()}</td>
+                                <td>
+                                  <span className={`payment-pill ${duty.payment_status === "paid" ? "paid" : "unpaid"}`}>
+                                    {duty.payment_status === "paid" ? "✅ Paid" : "⏳ Unpaid"}
+                                  </span>
+                                </td>
+                                <td>
+                                  {duty.payment_status !== "paid" && (
+                                    <button className="mark-paid-btn" onClick={() => markAsPaid(duty.id)}>
+                                      Mark Paid
+                                    </button>
+                                  )}
+                                  {duty.payment_status === "paid" && (
+                                    <span style={{ fontSize: 12, color: "#888" }}>
+                                      {duty.payment_cleared_at ? new Date(duty.payment_cleared_at).toLocaleDateString() : "Cleared"}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))
+                  )}
+
+                  {billing.filter(d => d.payment_status === "paid").length > 0 && (
+                    <>
+                      <h3 style={{ color: "#27ae60", marginBottom: 16, marginTop: 32 }}>✅ Cleared Dues</h3>
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Hospital</th>
+                            <th>Doctor</th>
+                            <th>Gross Pay</th>
+                            <th>Our Fee</th>
+                            <th>Cleared On</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {billing.filter(d => d.payment_status === "paid").map(duty => (
+                            <tr key={duty.id}>
+                              <td>{duty.date}</td>
+                              <td>{duty.hospitals?.hospital_name}</td>
+                              <td>{duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—"}</td>
+                              <td>₹{(duty.gross_pay || duty.pay || 0).toLocaleString()}</td>
+                              <td>₹{(duty.platform_fee || 0).toLocaleString()}</td>
+                              <td>{duty.payment_cleared_at ? new Date(duty.payment_cleared_at).toLocaleDateString() : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       )}

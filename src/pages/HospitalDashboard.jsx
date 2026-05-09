@@ -118,18 +118,28 @@ function HospitalDashboard() {
     e.preventDefault();
     setSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
+
+    const grossPay = parseFloat(form.pay);
+    const doctorPay = Math.round(grossPay * 0.8);
+    const platformFee = Math.round(grossPay * 0.2);
+
     const { error } = await supabase.from("locum_duties").insert({
       hospital_id: user.id,
       date: form.date,
       start_time: form.start_time,
       end_time: form.end_time,
       qualification: form.qualification,
-      pay: parseFloat(form.pay),
+      pay: grossPay,
+      gross_pay: grossPay,
+      doctor_pay: doctorPay,
+      platform_fee: platformFee,
       notes: form.notes,
       booked: false,
       completed: false,
       booking_status: "open",
+      payment_status: "unpaid",
     });
+
     if (error) {
       alert("Error posting duty: " + error.message);
     } else {
@@ -137,7 +147,7 @@ function HospitalDashboard() {
         body: {
           qualification: form.qualification,
           title: "New Locum Duty Available!",
-          body: `A new ${form.qualification} duty is available on ${form.date}. ₹${form.pay}`,
+          body: `A new ${form.qualification} duty is available on ${form.date}. ₹${doctorPay.toLocaleString()}`,
           url: "/doctor/dashboard",
         },
       });
@@ -228,8 +238,20 @@ function HospitalDashboard() {
             </select>
           </div>
           <div className="form-group">
-            <label>Pay (₹)</label>
-            <input name="pay" placeholder="e.g. 8000" type="number" required onChange={handle} value={form.pay} />
+            <label>Total Pay (₹)</label>
+            <input name="pay" placeholder="e.g. 10000" type="number" required onChange={handle} value={form.pay} />
+            {form.pay && parseFloat(form.pay) > 0 && (
+              <div className="pay-split">
+                <div className="split-item doctor">
+                  <span>👨‍⚕️ Doctor receives</span>
+                  <span>₹{Math.round(parseFloat(form.pay) * 0.8).toLocaleString()}</span>
+                </div>
+                <div className="split-item platform">
+                  <span>🏢 Platform fee (20%)</span>
+                  <span>₹{Math.round(parseFloat(form.pay) * 0.2).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="form-group">
             <label>Additional Notes (optional)</label>
@@ -253,7 +275,7 @@ function HospitalDashboard() {
             <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "booked" : duty.booking_status === "reopened" ? "reopened-card" : duty.booked ? "booked" : ""}`}>
               <div className="duty-header">
                 <h3>{duty.qualification}</h3>
-                <span className="pay">₹{duty.pay}</span>
+                <span className="pay">₹{duty.gross_pay || duty.pay}</span>
               </div>
               <div className="duty-details">
                 <p>📅 {duty.date}</p>
