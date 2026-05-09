@@ -51,43 +51,29 @@ const qualifications = [
   "Other",
 ];
 
-const TermsBox = ({ agreed, setAgreed }) => (
-  <div
-    onClick={() => setAgreed(!agreed)}
-    style={{
-      padding: "14px 16px",
-      background: agreed ? "#e8f5e9" : "#f5f7fa",
-      borderRadius: 10,
-      border: agreed ? "2px solid #27ae60" : "2px solid #e0e0e0",
-      cursor: "pointer",
-      textAlign: "center",
-    }}
-  >
-    <p style={{ fontSize: 14, color: "#555", lineHeight: 1.7, margin: 0 }}>
-      {agreed ? "✅ " : "☐ "}
-      I agree to the{" "}
-      
-        href="/terms"
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={e => e.stopPropagation()}
-        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}
-      >
-        Terms of Service
-      </a>
-      {" "}and{" "}
-      
-        href="/privacy"
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={e => e.stopPropagation()}
-        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}
-      >
-        Privacy Policy
-      </a>
-    </p>
-  </div>
-);
+function TermsBox({ agreed, setAgreed }) {
+  return (
+    <div
+      onClick={() => setAgreed(!agreed)}
+      style={{
+        padding: "14px 16px",
+        background: agreed ? "#e8f5e9" : "#f5f7fa",
+        borderRadius: "10px",
+        border: agreed ? "2px solid #27ae60" : "2px solid #e0e0e0",
+        cursor: "pointer",
+        textAlign: "center",
+      }}
+    >
+      <p style={{ fontSize: "14px", color: "#555", lineHeight: "1.7", margin: 0 }}>
+        {agreed ? "✅ " : "☐ "}
+        {"I agree to the "}
+        <a href="/terms" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#1e3a5f", fontWeight: 600 }}>Terms of Service</a>
+        {" and "}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#1e3a5f", fontWeight: 600 }}>Privacy Policy</a>
+      </p>
+    </div>
+  );
+}
 
 function Register() {
   const navigate = useNavigate();
@@ -98,21 +84,17 @@ function Register() {
       <img src={logo} alt="LOCUM" className="register-logo" />
       <h1>Create Account</h1>
       <p>Register as a Doctor or Hospital</p>
-
       {!role && (
         <div className="role-select">
           <button onClick={() => setRole("doctor")}>I am a Doctor</button>
           <button onClick={() => setRole("hospital")}>I am a Hospital</button>
         </div>
       )}
-
       {role === "doctor" && <DoctorForm navigate={navigate} />}
       {role === "hospital" && <HospitalForm navigate={navigate} />}
-
       {role && (
         <p className="back-link" onClick={() => setRole(null)}>← Go back</p>
       )}
-
       <p className="switch-link">
         Already have an account?{" "}
         <span onClick={() => navigate("/login")}>Login here</span>
