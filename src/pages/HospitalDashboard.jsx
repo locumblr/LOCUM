@@ -63,20 +63,20 @@ function HospitalDashboard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [hospitalName, setHospitalName] = useState("");
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     fetchHospitalData();
     fetchDuties();
+    fetchNotifications();
   }, []);
 
   const fetchHospitalData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-    const { data } = await supabase
-      .from("hospitals")
-      .select("hospital_name")
-      .eq("id", user.id)
-      .single();
+    const { data } = await supabase.from("hospitals").select("hospital_name").eq("id", user.id).single();
     if (data) setHospitalName(data.hospital_name);
   };
 
@@ -92,6 +92,24 @@ function HospitalDashboard() {
       .order("created_at", { ascending: false });
     if (!error) setDuties(data || []);
     setLoading(false);
+  };
+
+  const fetchNotifications = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    setNotifications(data || []);
+    setUnreadCount((data || []).filter(n => !n.read).length);
+  };
+
+  const markAllRead = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id);
+    fetchNotifications();
   };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -110,12 +128,11 @@ function HospitalDashboard() {
       notes: form.notes,
       booked: false,
       completed: false,
+      booking_status: "open",
     });
-
     if (error) {
       alert("Error posting duty: " + error.message);
     } else {
-      // Send push notification to matching doctors
       await supabase.functions.invoke("send-push", {
         body: {
           qualification: form.qualification,
@@ -137,6 +154,13 @@ function HospitalDashboard() {
     navigate("/");
   };
 
+  const getStatusLabel = (duty) => {
+    if (duty.booking_status === "confirmed") return <span className="status-badge status-confirmed">✅ Confirmed</span>;
+    if (duty.booking_status === "reopened") return <span className="status-badge status-reopened">🔄 Re-opened</span>;
+    if (duty.booking_status === "pending_verification") return <span className="status-badge status-pending">⏳ Pending Verification</span>;
+    return <span className="status-badge status-open">Open</span>;
+  };
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
@@ -145,11 +169,31 @@ function HospitalDashboard() {
           {hospitalName && <p style={{ color: "#888", fontSize: 14 }}>{hospitalName}</p>}
         </div>
         <div className="header-buttons">
+          <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}>
+            🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+          </button>
           <button onClick={() => navigate("/hospital/locums")}>My Locums</button>
           <button onClick={() => navigate("/hospital/profile")}>Profile</button>
           <button className="logout" onClick={logout}>Logout</button>
         </div>
       </div>
+
+      {showNotifications && (
+        <div className="notifications-panel">
+          <h3>🔔 Notifications</h3>
+          {notifications.length === 0 ? (
+            <p className="no-notif">No notifications yet</p>
+          ) : (
+            notifications.map(n => (
+              <div key={n.id} className={`notif-item ${n.read ? "read" : "unread"}`}>
+                <p className="notif-title">{n.title}</p>
+                <p className="notif-message">{n.message}</p>
+                <p className="notif-time">{new Date(n.created_at).toLocaleDateString()}</p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       <div className="post-section">
         <button className="post-btn" onClick={() => setShowForm(!showForm)}>
@@ -206,7 +250,7 @@ function HospitalDashboard() {
       ) : (
         <div className="duties-grid">
           {duties.map((duty) => (
-            <div key={duty.id} className={`duty-card ${duty.booked ? "booked" : ""}`}>
+            <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "booked" : duty.booking_status === "reopened" ? "reopened-card" : duty.booked ? "booked" : ""}`}>
               <div className="duty-header">
                 <h3>{duty.qualification}</h3>
                 <span className="pay">₹{duty.pay}</span>
@@ -216,9 +260,7 @@ function HospitalDashboard() {
                 <p>🕐 {duty.start_time} - {duty.end_time}</p>
                 {duty.notes && <p>📝 {duty.notes}</p>}
               </div>
-              <div className={`status-badge ${duty.booked ? "status-booked" : "status-open"}`}>
-                {duty.booked ? "Booked" : "Open"}
-              </div>
+              {getStatusLabel(duty)}
             </div>
           ))}
         </div>

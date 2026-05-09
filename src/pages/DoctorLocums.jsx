@@ -17,13 +17,11 @@ function DoctorLocums() {
   const fetchBookedDuties = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-
     const { data, error } = await supabase
       .from("locum_duties")
       .select("*, hospitals(hospital_name, address, phone, email), cover_requests(id, status, covering_doctor_id)")
       .eq("booked_by", user.id)
       .order("date", { ascending: true });
-
     if (!error) setDuties(data || []);
     setLoading(false);
   };
@@ -31,22 +29,18 @@ function DoctorLocums() {
   const submitCoverRequest = async () => {
     if (!coverReason) { alert("Please provide a reason for requesting cover."); return; }
     const { data: { user } } = await supabase.auth.getUser();
-
-    // Check if cover request already exists
     const existingRequest = requestingCover.cover_requests?.find(r => r.status === "open");
     if (existingRequest) {
       alert("You already have an open cover request for this duty.");
       setRequestingCover(null);
       return;
     }
-
     const { error } = await supabase.from("cover_requests").insert({
       duty_id: requestingCover.id,
       requesting_doctor_id: user.id,
       reason: coverReason,
       status: "open",
     });
-
     if (error) { alert("Error: " + error.message); return; }
     alert("Cover request submitted! Other eligible doctors will be notified.");
     setRequestingCover(null);
@@ -62,16 +56,10 @@ function DoctorLocums() {
   const getStatusBadge = (duty) => {
     const openCoverRequest = duty.cover_requests?.find(r => r.status === "open");
     const acceptedCoverRequest = duty.cover_requests?.find(r => r.status === "accepted");
-
-    if (acceptedCoverRequest) {
-      return <div className="status-badge cover-accepted">✅ Cover Found</div>;
-    }
-    if (openCoverRequest) {
-      return <div className="status-badge cover-pending">🔍 Looking for Cover...</div>;
-    }
-    if (duty.booking_status === "confirmed") {
-      return <div className="status-badge confirmed">✅ Confirmed by Hospital</div>;
-    }
+    if (acceptedCoverRequest) return <div className="status-badge cover-accepted">✅ Cover Found — You are released</div>;
+    if (openCoverRequest) return <div className="status-badge cover-pending">🔍 Looking for Cover...</div>;
+    if (duty.booking_status === "confirmed") return <div className="status-badge confirmed">✅ Confirmed by Hospital</div>;
+    if (duty.booking_status === "reopened") return <div className="status-badge reopened">🔄 Cover Accepted — Pending Re-verification</div>;
     return <div className="status-badge pending">⏳ Pending Verification</div>;
   };
 
@@ -98,9 +86,8 @@ function DoctorLocums() {
           {duties.map((duty) => {
             const openCoverRequest = duty.cover_requests?.find(r => r.status === "open");
             const acceptedCoverRequest = duty.cover_requests?.find(r => r.status === "accepted");
-
             return (
-              <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "confirmed" : "pending-card"} ${acceptedCoverRequest ? "cover-found" : ""}`}>
+              <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "confirmed" : acceptedCoverRequest ? "cover-found" : "pending-card"}`}>
                 <div className="duty-header">
                   <h3>{duty.hospitals?.hospital_name || "Hospital"}</h3>
                   <span className="pay">₹{duty.pay}</span>
@@ -121,7 +108,7 @@ function DoctorLocums() {
 
                 {getStatusBadge(duty)}
 
-                {duty.booking_status !== "confirmed" && (
+                {!openCoverRequest && !acceptedCoverRequest && duty.booking_status !== "confirmed" && (
                   <p className="verification-note">
                     The hospital is reviewing your credentials. You will be notified once confirmed.
                   </p>
@@ -130,7 +117,7 @@ function DoctorLocums() {
                 {openCoverRequest && (
                   <div className="cover-request-info">
                     <p>🔍 Your cover request is active. Waiting for another doctor to accept.</p>
-                    <p style={{ fontSize: 12, color: "#888" }}>Reason: {openCoverRequest.reason || coverReason}</p>
+                    <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Reason: {openCoverRequest.reason || coverReason}</p>
                   </div>
                 )}
 
@@ -141,10 +128,7 @@ function DoctorLocums() {
                 )}
 
                 {!openCoverRequest && !acceptedCoverRequest && !duty.completed && (
-                  <button
-                    className="cover-btn"
-                    onClick={() => { setRequestingCover(duty); setCoverReason(""); }}
-                  >
+                  <button className="cover-btn" onClick={() => { setRequestingCover(duty); setCoverReason(""); }}>
                     🔄 Request Cover
                   </button>
                 )}
@@ -154,7 +138,6 @@ function DoctorLocums() {
         </div>
       )}
 
-      {/* Cover Request Modal */}
       {requestingCover && (
         <div className="modal-overlay" onClick={() => setRequestingCover(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>

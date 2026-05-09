@@ -75,12 +75,8 @@ function DoctorDashboard() {
       .select("*, locum_duties(*, hospitals(hospital_name, address)), doctors(first_name, last_name)")
       .eq("status", "open")
       .neq("requesting_doctor_id", userId);
-
     if (!error) {
-      // Filter cover requests where duty qualification matches doctor's qualification
-      const filtered = (data || []).filter(cr =>
-        cr.locum_duties?.qualification === qualification
-      );
+      const filtered = (data || []).filter(cr => cr.locum_duties?.qualification === qualification);
       setCoverRequests(filtered);
     }
   };
@@ -125,19 +121,37 @@ function DoctorDashboard() {
     setAccepting(coverRequest.id);
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Update cover request
+    const { data: coveringDoctor } = await supabase
+      .from("doctors")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .single();
+
     await supabase.from("cover_requests").update({
       status: "accepted",
       covering_doctor_id: user.id,
     }).eq("id", coverRequest.id);
 
-    // Update the duty to assign to covering doctor
-    await supabase.from("locum_duties").update({
+    const { error } = await supabase.from("locum_duties").update({
       booked_by: user.id,
-      booking_status: "pending_verification",
+      booked: true,
+      booking_status: "reopened",
     }).eq("id", coverRequest.duty_id);
 
-    alert("You have accepted the cover! The hospital will be notified and will need to verify your credentials.");
+    if (error) {
+      alert("Error accepting cover: " + error.message);
+      setAccepting(null);
+      return;
+    }
+
+    // Notify hospital
+    await supabase.from("notifications").insert({
+      user_id: coverRequest.locum_duties?.hospital_id,
+      title: "🔄 Booking Re-opened — Re-verification Required",
+      message: `Dr. ${coverRequest.doctors?.first_name} ${coverRequest.doctors?.last_name} has requested cover for the ${coverRequest.locum_duties?.qualification} duty on ${coverRequest.locum_duties?.date}. Dr. ${coveringDoctor?.first_name} ${coveringDoctor?.last_name} has agreed to cover and requires your verification.`,
+    });
+
+    alert("You have accepted the cover! The hospital has been notified and will need to re-verify your credentials.");
     fetchDuties(doctorQualification);
     fetchCoverRequests(doctorQualification, user.id);
     setAccepting(null);
@@ -162,7 +176,6 @@ function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Cover Requests Section */}
       {coverRequests.length > 0 && (
         <div className="cover-requests-section">
           <h2>🔄 Cover Requests</h2>
@@ -188,7 +201,7 @@ function DoctorDashboard() {
                   onClick={() => acceptCover(cr)}
                   disabled={accepting === cr.id}
                 >
-                  {accepting === cr.id ? "Accepting..." : "Accept Cover"}
+                  {accepting === cr.id ? "Accepting..." : "✅ Accept Cover"}
                 </button>
               </div>
             ))}
