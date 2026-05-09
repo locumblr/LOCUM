@@ -160,6 +160,40 @@
   accent-color: #1e3a5f;
 }
 
+.terms-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  color: #555;
+  cursor: pointer;
+  padding: 14px;
+  background: #f5f7fa;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  line-height: 1.5;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.terms-checkbox span {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.terms-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #1e3a5f;
+}
+
 .terms-checkbox a {
   color: #1e3a5f;
   font-weight: 600;
