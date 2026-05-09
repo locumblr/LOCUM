@@ -1,0 +1,21 @@
+.support-content h1 { color: #1e3a5f; font-size: 32px; margin-bottom: 8px; }
+.support-subtitle { color: #888; font-size: 16px; margin-bottom: 32px; }
+.contact-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 40px; }
+.contact-card { background: white; border-radius: 12px; padding: 24px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.contact-icon { font-size: 32px; display: block; margin-bottom: 12px; }
+.contact-card h3 { color: #1e3a5f; font-size: 16px; margin-bottom: 6px; }
+.contact-card p { color: #555; font-size: 14px; }
+.support-form { background: white; border-radius: 16px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); display: flex; flex-direction: column; gap: 16px; }
+.support-form h2 { color: #1e3a5f; font-size: 22px; }
+.support-form-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.support-form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+.support-form-group label { font-size: 14px; color: #555; font-weight: 600; }
+.support-form-group input, .support-form-group select, .support-form-group textarea { padding: 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; width: 100%; font-family: Arial, sans-serif; }
+.support-submit-btn { padding: 14px; background: #1e3a5f; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+.support-submit-btn:hover { background: #16304d; }
+.support-submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+.success-box { background: white; border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.success-box h2 { color: #1e3a5f; margin-bottom: 12px; }
+.success-box p { color: #555; margin-bottom: 24px; }
+.success-box button { padding: 12px 28px; background: #1e3a5f; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+@media (max-width: 768px) { .contact-cards { grid-template-columns: 1fr !important; } }
