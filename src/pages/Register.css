@@ -172,3 +172,8 @@
   font-weight: 600;
   text-decoration: underline;
 }
+.register-form .terms-checkbox {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
