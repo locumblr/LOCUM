@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import "./HospitalDashboard.css";
 
-const qualifications = [
+const allQualifications = [
   "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
   "MD - General Medicine",
   "MD - Paediatrics",
@@ -52,7 +52,7 @@ const qualifications = [
 
 const emptyForm = {
   date: "", start_time: "", end_time: "",
-  qualification: "", pay: "", notes: "",
+  qualifications: [], pay: "", notes: "",
 };
 
 function HospitalDashboard() {
@@ -66,6 +66,7 @@ function HospitalDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showQualDropdown, setShowQualDropdown] = useState(false);
 
   useEffect(() => {
     fetchHospitalData();
@@ -114,8 +115,21 @@ function HospitalDashboard() {
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  const toggleQualification = (q) => {
+    const current = form.qualifications;
+    if (current.includes(q)) {
+      setForm({ ...form, qualifications: current.filter(x => x !== q) });
+    } else {
+      setForm({ ...form, qualifications: [...current, q] });
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    if (form.qualifications.length === 0) {
+      alert("Please select at least one qualification.");
+      return;
+    }
     setSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -128,7 +142,8 @@ function HospitalDashboard() {
       date: form.date,
       start_time: form.start_time,
       end_time: form.end_time,
-      qualification: form.qualification,
+      qualification: form.qualifications[0],
+      qualifications: form.qualifications,
       pay: grossPay,
       gross_pay: grossPay,
       doctor_pay: doctorPay,
@@ -143,14 +158,16 @@ function HospitalDashboard() {
     if (error) {
       alert("Error posting duty: " + error.message);
     } else {
-      await supabase.functions.invoke("send-push", {
-        body: {
-          qualification: form.qualification,
-          title: "New Locum Duty Available!",
-          body: `A new ${form.qualification} duty is available on ${form.date}. ₹${doctorPay.toLocaleString()}`,
-          url: "/doctor/dashboard",
-        },
-      });
+      for (const q of form.qualifications) {
+        await supabase.functions.invoke("send-push", {
+          body: {
+            qualification: q,
+            title: "New Locum Duty Available!",
+            body: `A new duty is available on ${form.date}. ₹${doctorPay.toLocaleString()}`,
+            url: "/doctor/dashboard",
+          },
+        });
+      }
       alert("Locum duty posted successfully!");
       setForm(emptyForm);
       setShowForm(false);
@@ -229,15 +246,48 @@ function HospitalDashboard() {
               <input name="end_time" type="time" required onChange={handle} value={form.end_time} />
             </div>
           </div>
+
           <div className="form-group">
-            <label>Required Qualification</label>
-            <select name="qualification" required onChange={handle} value={form.qualification} defaultValue="">
-              <option value="" disabled>Select Required Qualification</option>
-              {qualifications.map((q) => (
-                <option key={q} value={q}>{q}</option>
-              ))}
-            </select>
+            <label>Required Qualifications {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>}</label>
+            <div className="qual-dropdown-container">
+              <div
+                className="qual-dropdown-trigger"
+                onClick={() => setShowQualDropdown(!showQualDropdown)}
+              >
+                {form.qualifications.length === 0
+                  ? "Select qualifications..."
+                  : form.qualifications.length === 1
+                  ? form.qualifications[0]
+                  : `${form.qualifications.length} qualifications selected`}
+                <span style={{ float: "right" }}>{showQualDropdown ? "▲" : "▼"}</span>
+              </div>
+              {showQualDropdown && (
+                <div className="qual-dropdown-list">
+                  {allQualifications.map((q) => (
+                    <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={form.qualifications.includes(q)}
+                        onChange={() => toggleQualification(q)}
+                        style={{ marginRight: 8 }}
+                      />
+                      {q}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {form.qualifications.length > 0 && (
+              <div className="selected-quals">
+                {form.qualifications.map(q => (
+                  <span key={q} className="qual-tag">
+                    {q} <button type="button" onClick={() => toggleQualification(q)}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
+
           <div className="form-group">
             <label>Total Pay (₹)</label>
             <input name="pay" placeholder="e.g. 10000" type="number" required onChange={handle} value={form.pay} />
@@ -254,6 +304,7 @@ function HospitalDashboard() {
               </div>
             )}
           </div>
+
           <div className="form-group">
             <label>Additional Notes (optional)</label>
             <textarea name="notes" placeholder="Any special requirements..." onChange={handle} value={form.notes} rows={3} />
@@ -275,12 +326,19 @@ function HospitalDashboard() {
           {duties.map((duty) => (
             <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "booked" : duty.booking_status === "reopened" ? "reopened-card" : duty.booked ? "booked" : ""}`}>
               <div className="duty-header">
-                <h3>{duty.qualification}</h3>
+                <h3>{duty.qualifications ? `${duty.qualifications.length} Qualification${duty.qualifications.length > 1 ? "s" : ""}` : duty.qualification}</h3>
                 <span className="pay">₹{duty.gross_pay || duty.pay}</span>
               </div>
               <div className="duty-details">
                 <p>📅 {duty.date}</p>
                 <p>🕐 {duty.start_time} - {duty.end_time}</p>
+                {duty.qualifications && duty.qualifications.length > 0 && (
+                  <div style={{ marginTop: 6 }}>
+                    {duty.qualifications.map(q => (
+                      <span key={q} style={{ display: "inline-block", background: "#e3f2fd", color: "#1565c0", borderRadius: 20, padding: "2px 10px", fontSize: 12, marginRight: 4, marginBottom: 4 }}>{q}</span>
+                    ))}
+                  </div>
+                )}
                 {duty.notes && <p>📝 {duty.notes}</p>}
               </div>
               {getStatusLabel(duty)}

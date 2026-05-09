@@ -62,7 +62,7 @@ function DoctorDashboard() {
     const { data, error } = await supabase
       .from("locum_duties")
       .select("*, hospitals(hospital_name, address)")
-      .eq("qualification", qualification)
+      .or(`qualification.eq.${qualification},qualifications.cs.{${qualification}}`)
       .eq("booked", false)
       .eq("completed", false)
       .eq("booking_status", "open")

@@ -46,3 +46,12 @@
 .status-pending { background: #fff3e0; color: #e65100; }
 .status-confirmed { background: #e8f5e9; color: #2e7d32; }
 .status-reopened { background: #fff3e0; color: #e65100; }
+.qual-dropdown-container { position: relative; }
+.qual-dropdown-trigger { padding: 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; background: white; user-select: none; }
+.qual-dropdown-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-radius: 8px; max-height: 250px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.qual-option { display: flex; align-items: center; padding: 10px 14px; font-size: 14px; cursor: pointer; color: #333; }
+.qual-option:hover { background: #f5f7fa; }
+.qual-option.selected { background: #e8f5e9; color: #2e7d32; }
+.selected-quals { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.qual-tag { display: flex; align-items: center; gap: 4px; background: #1e3a5f; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+.qual-tag button { background: none; border: none; color: white; cursor: pointer; font-size: 14px; padding: 0; line-height: 1; }
