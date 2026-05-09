@@ -36,6 +36,105 @@ function Register() {
   );
 }
 
+const qualifications = [
+  "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
+  "MD - General Medicine",
+  "MD - Paediatrics",
+  "MD - Psychiatry",
+  "MD - Dermatology",
+  "MD - Anaesthesiology",
+  "MD - Radiology",
+  "MD - Pathology",
+  "MD - Microbiology",
+  "MD - Biochemistry",
+  "MD - Community Medicine",
+  "MS - General Surgery",
+  "MS - Orthopaedics",
+  "MS - Ophthalmology",
+  "MS - ENT (Otorhinolaryngology)",
+  "MS - Obstetrics & Gynaecology",
+  "MCh - Neurosurgery",
+  "MCh - Cardiothoracic Surgery",
+  "MCh - Plastic Surgery",
+  "MCh - Urology",
+  "DM - Cardiology",
+  "DM - Neurology",
+  "DM - Nephrology",
+  "DM - Gastroenterology",
+  "DM - Endocrinology",
+  "DM - Oncology",
+  "DNB - General Medicine",
+  "DNB - General Surgery",
+  "DNB - Paediatrics",
+  "DNB - Obstetrics & Gynaecology",
+  "DNB - Orthopaedics",
+  "DNB - Anaesthesiology",
+  "BDS / MDS (Dentistry)",
+  "B.Pharm / M.Pharm (Pharmacy)",
+  "B.Sc Nursing / M.Sc Nursing",
+  "Diploma in Anaesthesiology (DA)",
+  "Diploma in Child Health (DCH)",
+  "Diploma in Obstetrics & Gynaecology (DGO)",
+  "Diploma in Orthopaedics (D.Ortho)",
+  "Diploma in Ophthalmology (DO)",
+  "Diploma in ENT",
+  "Diploma in Radiology (DMRD)",
+  "Fellowship in Emergency Medicine (FCEM)",
+  "Other",
+];
+
+const TermsCheckbox = ({ agreed, setAgreed }) => (
+  <div style={{
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 14,
+    background: "#f5f7fa",
+    borderRadius: 10,
+    border: "1px solid #e0e0e0",
+    width: "100%",
+    boxSizing: "border-box",
+    overflow: "hidden",
+  }}>
+    <input
+      type="checkbox"
+      checked={agreed}
+      onChange={(e) => setAgreed(e.target.checked)}
+      style={{
+        width: 20,
+        minWidth: 20,
+        height: 20,
+        marginTop: 2,
+        cursor: "pointer",
+        accentColor: "#1e3a5f",
+        flexShrink: 0,
+      }}
+    />
+    <div style={{
+      fontSize: 14,
+      color: "#555",
+      lineHeight: 1.6,
+      flex: 1,
+      minWidth: 0,
+      overflow: "hidden",
+      wordBreak: "break-word",
+      overflowWrap: "break-word",
+    }}>
+      I agree to the{" "}
+      <a href="/terms" target="_blank" rel="noopener noreferrer"
+        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}>
+        Terms of Service
+      </a>
+      {" "}and{" "}
+      <a href="/privacy" target="_blank" rel="noopener noreferrer"
+        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}>
+        Privacy Policy
+      </a>
+    </div>
+  </div>
+);
+
 function DoctorForm({ navigate }) {
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
@@ -47,53 +146,6 @@ function DoctorForm({ navigate }) {
   const [error, setError] = useState("");
   const [agreed, setAgreed] = useState(false);
 
-  const qualifications = [
-    "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
-    "MD - General Medicine",
-    "MD - Paediatrics",
-    "MD - Psychiatry",
-    "MD - Dermatology",
-    "MD - Anaesthesiology",
-    "MD - Radiology",
-    "MD - Pathology",
-    "MD - Microbiology",
-    "MD - Biochemistry",
-    "MD - Community Medicine",
-    "MS - General Surgery",
-    "MS - Orthopaedics",
-    "MS - Ophthalmology",
-    "MS - ENT (Otorhinolaryngology)",
-    "MS - Obstetrics & Gynaecology",
-    "MCh - Neurosurgery",
-    "MCh - Cardiothoracic Surgery",
-    "MCh - Plastic Surgery",
-    "MCh - Urology",
-    "DM - Cardiology",
-    "DM - Neurology",
-    "DM - Nephrology",
-    "DM - Gastroenterology",
-    "DM - Endocrinology",
-    "DM - Oncology",
-    "DNB - General Medicine",
-    "DNB - General Surgery",
-    "DNB - Paediatrics",
-    "DNB - Obstetrics & Gynaecology",
-    "DNB - Orthopaedics",
-    "DNB - Anaesthesiology",
-    "BDS / MDS (Dentistry)",
-    "B.Pharm / M.Pharm (Pharmacy)",
-    "B.Sc Nursing / M.Sc Nursing",
-    "Diploma in Anaesthesiology (DA)",
-    "Diploma in Child Health (DCH)",
-    "Diploma in Obstetrics & Gynaecology (DGO)",
-    "Diploma in Orthopaedics (D.Ortho)",
-    "Diploma in Ophthalmology (DO)",
-    "Diploma in ENT",
-    "Diploma in Radiology (DMRD)",
-    "Fellowship in Emergency Medicine (FCEM)",
-    "Other",
-  ];
-
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const submit = async (e) => {
@@ -103,7 +155,6 @@ function DoctorForm({ navigate }) {
     if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
     if (!certificate) { setError("Please upload your certificate."); return; }
     setLoading(true);
-
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
@@ -111,14 +162,10 @@ function DoctorForm({ navigate }) {
         options: { data: { role: "doctor" } }
       });
       if (authError) throw authError;
-
       const fileExt = certificate.name.split('.').pop();
       const fileName = `doctors/${authData.user.id}/certificate.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(fileName, certificate);
+      const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, certificate);
       if (uploadError) throw uploadError;
-
       const { error: dbError } = await supabase.from("doctors").insert({
         id: authData.user.id,
         first_name: form.firstName,
@@ -131,7 +178,6 @@ function DoctorForm({ navigate }) {
         status: "active",
       });
       if (dbError) throw dbError;
-
       alert("Registration successful! You can now log in to your account.");
       navigate("/login");
     } catch (err) {
@@ -145,45 +191,24 @@ function DoctorForm({ navigate }) {
     <form onSubmit={submit} className="register-form">
       <h2>Doctor Registration</h2>
       {error && <p className="error-msg">{error}</p>}
-
       <div className="form-row">
         <input name="firstName" placeholder="First Name" required onChange={handle} />
         <input name="lastName" placeholder="Last Name" required onChange={handle} />
       </div>
       <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
       <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
-
       <select name="qualification" required onChange={handle} defaultValue="">
         <option value="" disabled>Select Your Qualification</option>
-        {qualifications.map((q) => (
-          <option key={q} value={q}>{q}</option>
-        ))}
+        {qualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
       </select>
-
       <input name="experience" placeholder="Years of Experience" type="number" required onChange={handle} />
-
       <label className="file-label">
         Upload Certificate / Proof of Qualification
         <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
       </label>
-
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
-
-      <div className="terms-checkbox">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => setAgreed(e.target.checked)}
-        />
-        <span>
-          I agree to the{" "}
-          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-          {" "}and{" "}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-        </span>
-      </div>
-
+      <TermsCheckbox agreed={agreed} setAgreed={setAgreed} />
       <button type="submit" disabled={loading || !agreed}>
         {loading ? "Submitting..." : "Create Account"}
       </button>
@@ -211,7 +236,6 @@ function HospitalForm({ navigate }) {
     if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
     if (!document) { setError("Please upload your registration certificate."); return; }
     setLoading(true);
-
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
@@ -219,14 +243,10 @@ function HospitalForm({ navigate }) {
         options: { data: { role: "hospital" } }
       });
       if (authError) throw authError;
-
       const fileExt = document.name.split('.').pop();
       const fileName = `hospitals/${authData.user.id}/certificate.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(fileName, document);
+      const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, document);
       if (uploadError) throw uploadError;
-
       const { error: dbError } = await supabase.from("hospitals").insert({
         id: authData.user.id,
         hospital_name: form.hospitalName,
@@ -239,7 +259,6 @@ function HospitalForm({ navigate }) {
         status: "pending",
       });
       if (dbError) throw dbError;
-
       alert("Application submitted! Our team will review your registration and notify you once approved.");
       navigate("/");
     } catch (err) {
@@ -253,36 +272,19 @@ function HospitalForm({ navigate }) {
     <form onSubmit={submit} className="register-form">
       <h2>Hospital Registration</h2>
       {error && <p className="error-msg">{error}</p>}
-
       <input name="hospitalName" placeholder="Hospital / Clinic Name" required onChange={handle} />
       <input name="email" type="email" placeholder="Official Email Address" required onChange={handle} />
       <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
       <input name="address" placeholder="Physical Address" required onChange={handle} />
       <input name="registrationNumber" placeholder="Hospital Registration Number" required onChange={handle} />
       <input name="contactPerson" placeholder="Contact Person Full Name" required onChange={handle} />
-
       <label className="file-label">
         Upload Registration Certificate
         <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setDocument(e.target.files[0])} required />
       </label>
-
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
-
-      <div className="terms-checkbox">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => setAgreed(e.target.checked)}
-        />
-        <span>
-          I agree to the{" "}
-          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-          {" "}and{" "}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-        </span>
-      </div>
-
+      <TermsCheckbox agreed={agreed} setAgreed={setAgreed} />
       <button type="submit" disabled={loading || !agreed}>
         {loading ? "Submitting..." : "Submit Application"}
       </button>
