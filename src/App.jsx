@@ -12,6 +12,8 @@ import AdminPanel from "./pages/AdminPanel";
 import AdminLogin from "./pages/AdminLogin";
 import AdminRecords from "./pages/AdminRecords";
 import ResetPassword from "./pages/ResetPassword";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 
 function App() {
   return (
@@ -20,6 +22,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
         <Route path="/doctor/locums" element={<DoctorLocums />} />
         <Route path="/doctor/profile" element={<Profile />} />
@@ -29,7 +32,8 @@ function App() {
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/records" element={<AdminRecords />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
       </Routes>
     </BrowserRouter>
   );

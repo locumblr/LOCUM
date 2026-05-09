@@ -12,6 +12,10 @@ function Home() {
         <button onClick={() => navigate("/login")}>Login</button>
         <button onClick={() => navigate("/register")}>Register</button>
       </div>
+      <div style={{ marginTop: 40, display: "flex", gap: 20, fontSize: 13, color: "#888" }}>
+        <span style={{ cursor: "pointer" }} onClick={() => navigate("/terms")}>Terms of Service</span>
+        <span style={{ cursor: "pointer" }} onClick={() => navigate("/privacy")}>Privacy Policy</span>
+      </div>
     </div>
   );
 }
