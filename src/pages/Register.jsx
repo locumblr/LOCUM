@@ -4,38 +4,6 @@ import { supabase } from "../supabaseClient";
 import "./Register.css";
 import logo from "../assets/logo.png";
 
-function Register() {
-  const navigate = useNavigate();
-  const [role, setRole] = useState(null);
-
-  return (
-    <div className="register-container">
-      <img src={logo} alt="LOCUM" className="register-logo" />
-      <h1>Create Account</h1>
-      <p>Register as a Doctor or Hospital</p>
-
-      {!role && (
-        <div className="role-select">
-          <button onClick={() => setRole("doctor")}>I am a Doctor</button>
-          <button onClick={() => setRole("hospital")}>I am a Hospital</button>
-        </div>
-      )}
-
-      {role === "doctor" && <DoctorForm navigate={navigate} />}
-      {role === "hospital" && <HospitalForm navigate={navigate} />}
-
-      {role && (
-        <p className="back-link" onClick={() => setRole(null)}>← Go back</p>
-      )}
-
-      <p className="switch-link">
-        Already have an account?{" "}
-        <span onClick={() => navigate("/login")}>Login here</span>
-      </p>
-    </div>
-  );
-}
-
 const qualifications = [
   "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
   "MD - General Medicine",
@@ -83,53 +51,75 @@ const qualifications = [
   "Other",
 ];
 
-const TermsCheckbox = ({ agreed, setAgreed }) => (
-  <div style={{
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    padding: 14,
-    background: "#f5f7fa",
-    borderRadius: 10,
-    border: "1px solid #e0e0e0",
-    boxSizing: "border-box",
-  }}>
-    <input
-      type="checkbox"
-      checked={agreed}
-      onChange={(e) => setAgreed(e.target.checked)}
-      style={{
-        width: "20px",
-        minWidth: "20px",
-        maxWidth: "20px",
-        height: "20px",
-        marginTop: 2,
-        cursor: "pointer",
-        accentColor: "#1e3a5f",
-        flexShrink: 0,
-      }}
-    />
-    <div style={{
-      fontSize: 14,
-      color: "#555",
-      lineHeight: 1.6,
-      wordBreak: "break-word",
-      overflowWrap: "break-word",
-    }}>
+const TermsBox = ({ agreed, setAgreed }) => (
+  <div
+    onClick={() => setAgreed(!agreed)}
+    style={{
+      padding: "14px 16px",
+      background: agreed ? "#e8f5e9" : "#f5f7fa",
+      borderRadius: 10,
+      border: agreed ? "2px solid #27ae60" : "2px solid #e0e0e0",
+      cursor: "pointer",
+      textAlign: "center",
+    }}
+  >
+    <p style={{ fontSize: 14, color: "#555", lineHeight: 1.7, margin: 0 }}>
+      {agreed ? "✅ " : "☐ "}
       I agree to the{" "}
-      <a href="/terms" target="_blank" rel="noopener noreferrer"
-        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}>
+      
+        href="/terms"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}
+      >
         Terms of Service
       </a>
       {" "}and{" "}
-      <a href="/privacy" target="_blank" rel="noopener noreferrer"
-        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}>
+      
+        href="/privacy"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        style={{ color: "#1e3a5f", fontWeight: 600, textDecoration: "underline" }}
+      >
         Privacy Policy
       </a>
-    </div>
+    </p>
   </div>
 );
+
+function Register() {
+  const navigate = useNavigate();
+  const [role, setRole] = useState(null);
+
+  return (
+    <div className="register-container">
+      <img src={logo} alt="LOCUM" className="register-logo" />
+      <h1>Create Account</h1>
+      <p>Register as a Doctor or Hospital</p>
+
+      {!role && (
+        <div className="role-select">
+          <button onClick={() => setRole("doctor")}>I am a Doctor</button>
+          <button onClick={() => setRole("hospital")}>I am a Hospital</button>
+        </div>
+      )}
+
+      {role === "doctor" && <DoctorForm navigate={navigate} />}
+      {role === "hospital" && <HospitalForm navigate={navigate} />}
+
+      {role && (
+        <p className="back-link" onClick={() => setRole(null)}>← Go back</p>
+      )}
+
+      <p className="switch-link">
+        Already have an account?{" "}
+        <span onClick={() => navigate("/login")}>Login here</span>
+      </p>
+    </div>
+  );
+}
 
 function DoctorForm({ navigate }) {
   const [form, setForm] = useState({
@@ -204,7 +194,7 @@ function DoctorForm({ navigate }) {
       </label>
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
-      <TermsCheckbox agreed={agreed} setAgreed={setAgreed} />
+      <TermsBox agreed={agreed} setAgreed={setAgreed} />
       <button type="submit" disabled={loading || !agreed}>
         {loading ? "Submitting..." : "Create Account"}
       </button>
@@ -280,7 +270,7 @@ function HospitalForm({ navigate }) {
       </label>
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
-      <TermsCheckbox agreed={agreed} setAgreed={setAgreed} />
+      <TermsBox agreed={agreed} setAgreed={setAgreed} />
       <button type="submit" disabled={loading || !agreed}>
         {loading ? "Submitting..." : "Submit Application"}
       </button>
