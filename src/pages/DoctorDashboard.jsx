@@ -12,6 +12,8 @@ function DoctorDashboard() {
   const [doctorQualification, setDoctorQualification] = useState("");
   const [booking, setBooking] = useState(null);
   const [accepting, setAccepting] = useState(null);
+  const [searchDate, setSearchDate] = useState("");
+  const [searchLocation, setSearchLocation] = useState("");
 
   useEffect(() => {
     fetchDoctorData();
@@ -120,37 +122,30 @@ function DoctorDashboard() {
     if (!confirmed) return;
     setAccepting(coverRequest.id);
     const { data: { user } } = await supabase.auth.getUser();
-
     const { data: coveringDoctor } = await supabase
       .from("doctors")
       .select("first_name, last_name")
       .eq("id", user.id)
       .single();
-
     await supabase.from("cover_requests").update({
       status: "accepted",
       covering_doctor_id: user.id,
     }).eq("id", coverRequest.id);
-
     const { error } = await supabase.from("locum_duties").update({
       booked_by: user.id,
       booked: true,
       booking_status: "reopened",
     }).eq("id", coverRequest.duty_id);
-
     if (error) {
       alert("Error accepting cover: " + error.message);
       setAccepting(null);
       return;
     }
-
-    // Notify hospital
     await supabase.from("notifications").insert({
       user_id: coverRequest.locum_duties?.hospital_id,
       title: "🔄 Booking Re-opened — Re-verification Required",
       message: `Dr. ${coverRequest.doctors?.first_name} ${coverRequest.doctors?.last_name} has requested cover for the ${coverRequest.locum_duties?.qualification} duty on ${coverRequest.locum_duties?.date}. Dr. ${coveringDoctor?.first_name} ${coveringDoctor?.last_name} has agreed to cover and requires your verification.`,
     });
-
     alert("You have accepted the cover! The hospital has been notified and will need to re-verify your credentials.");
     fetchDuties(doctorQualification);
     fetchCoverRequests(doctorQualification, user.id);
@@ -161,6 +156,15 @@ function DoctorDashboard() {
     await supabase.auth.signOut();
     navigate("/");
   };
+
+  const filteredDuties = duties.filter(duty => {
+    const matchesDate = searchDate ? duty.date === searchDate : true;
+    const matchesLocation = searchLocation
+      ? duty.hospitals?.address?.toLowerCase().includes(searchLocation.toLowerCase()) ||
+        duty.hospitals?.hospital_name?.toLowerCase().includes(searchLocation.toLowerCase())
+      : true;
+    return matchesDate && matchesLocation;
+  });
 
   return (
     <div className="dashboard-container">
@@ -187,7 +191,7 @@ function DoctorDashboard() {
                 <div className="cover-badge">Cover Needed</div>
                 <div className="duty-header">
                   <h3>{cr.locum_duties?.hospitals?.hospital_name}</h3>
-                  <span className="pay">₹{cr.locum_duties?.pay}</span>
+                  <span className="pay">₹{(cr.locum_duties?.doctor_pay || Math.round((cr.locum_duties?.pay || 0) * 0.8)).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
                   <p>📍 {cr.locum_duties?.hospitals?.address}</p>
@@ -215,17 +219,40 @@ function DoctorDashboard() {
         {doctorQualification ? `Showing duties matching: ${doctorQualification}` : "Loading..."}
       </p>
 
+      <div className="search-bar">
+        <input
+          type="date"
+          className="search-input"
+          value={searchDate}
+          onChange={(e) => setSearchDate(e.target.value)}
+        />
+        <input
+          type="text"
+          className="search-input"
+          value={searchLocation}
+          onChange={(e) => setSearchLocation(e.target.value)}
+          placeholder="🔍 Search by hospital or location..."
+        />
+        {(searchDate || searchLocation) && (
+          <button className="clear-btn" onClick={() => { setSearchDate(""); setSearchLocation(""); }}>
+            ✕ Clear
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <p style={{ color: "#888" }}>Loading duties...</p>
       ) : duties.length === 0 ? (
         <p style={{ color: "#888" }}>No available duties matching your qualification at the moment.</p>
+      ) : filteredDuties.length === 0 ? (
+        <p style={{ color: "#888" }}>No duties match your search. <span style={{ color: "#1e3a5f", cursor: "pointer" }} onClick={() => { setSearchDate(""); setSearchLocation(""); }}>Clear filters</span></p>
       ) : (
         <div className="duties-grid">
-          {duties.map((duty) => (
+          {filteredDuties.map((duty) => (
             <div key={duty.id} className="duty-card">
               <div className="duty-header">
                 <h3>{duty.hospitals?.hospital_name || "Hospital"}</h3>
-                <span className="pay">₹{duty.pay}</span>
+                <span className="pay">₹{(duty.doctor_pay || Math.round(duty.pay * 0.8)).toLocaleString()}</span>
               </div>
               <div className="duty-details">
                 <p>📍 {duty.hospitals?.address || "Address not provided"}</p>

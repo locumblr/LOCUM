@@ -90,7 +90,7 @@ function DoctorLocums() {
               <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "confirmed" : acceptedCoverRequest ? "cover-found" : "pending-card"}`}>
                 <div className="duty-header">
                   <h3>{duty.hospitals?.hospital_name || "Hospital"}</h3>
-                  <span className="pay">₹{duty.pay}</span>
+                  <span className="pay">₹{(duty.doctor_pay || Math.round(duty.pay * 0.8)).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
                   <p>📍 {duty.hospitals?.address || "—"}</p>
