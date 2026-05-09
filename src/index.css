@@ -162,17 +162,3 @@ input, select, textarea, button {
   h2 {
     font-size: 20px !important;
   }
-
-  .register-form {
-    max-width: 100% !important;
-    width: 100% !important;
-    overflow: hidden !important;
-  }
-
-  .register-form input,
-  .register-form select,
-  .register-form button {
-    max-width: 100% !important;
-    width: 100% !important;
-  }
-}

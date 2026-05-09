@@ -93,18 +93,17 @@ const TermsCheckbox = ({ agreed, setAgreed }) => (
     background: "#f5f7fa",
     borderRadius: 10,
     border: "1px solid #e0e0e0",
-    width: "100%",
     boxSizing: "border-box",
-    overflow: "hidden",
   }}>
     <input
       type="checkbox"
       checked={agreed}
       onChange={(e) => setAgreed(e.target.checked)}
       style={{
-        width: 20,
-        minWidth: 20,
-        height: 20,
+        width: "20px",
+        minWidth: "20px",
+        maxWidth: "20px",
+        height: "20px",
         marginTop: 2,
         cursor: "pointer",
         accentColor: "#1e3a5f",
@@ -115,9 +114,6 @@ const TermsCheckbox = ({ agreed, setAgreed }) => (
       fontSize: 14,
       color: "#555",
       lineHeight: 1.6,
-      flex: 1,
-      minWidth: 0,
-      overflow: "hidden",
       wordBreak: "break-word",
       overflowWrap: "break-word",
     }}>
