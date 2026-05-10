@@ -8,6 +8,8 @@ function Profile() {
   const [activeTab, setActiveTab] = useState("personal");
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dutyHistory, setDutyHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const [personal, setPersonal] = useState({
     firstName: "", lastName: "", email: "",
@@ -23,8 +25,6 @@ function Profile() {
     newPass: "", confirm: "",
   });
 
-  const [photo, setPhoto] = useState(null);
-
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -32,16 +32,10 @@ function Profile() {
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-
     const userRole = user.user_metadata?.role;
     setRole(userRole);
-
     if (userRole === "doctor") {
-      const { data } = await supabase
-        .from("doctors")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      const { data } = await supabase.from("doctors").select("*").eq("id", user.id).single();
       if (data) {
         setPersonal({
           firstName: data.first_name || "",
@@ -56,11 +50,7 @@ function Profile() {
         });
       }
     } else if (userRole === "hospital") {
-      const { data } = await supabase
-        .from("hospitals")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      const { data } = await supabase.from("hospitals").select("*").eq("id", user.id).single();
       if (data) {
         setPersonal({
           hospitalName: data.hospital_name || "",
@@ -75,16 +65,36 @@ function Profile() {
     setLoading(false);
   };
 
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    if (role === "doctor") {
+      const { data } = await supabase
+        .from("locum_duties")
+        .select("*, hospitals(hospital_name, address)")
+        .eq("booked_by", user.id)
+        .order("date", { ascending: false });
+      setDutyHistory(data || []);
+    } else if (role === "hospital") {
+      const { data } = await supabase
+        .from("locum_duties")
+        .select("*, doctors(first_name, last_name)")
+        .eq("hospital_id", user.id)
+        .order("date", { ascending: false });
+      setDutyHistory(data || []);
+    }
+    setHistoryLoading(false);
+  };
+
   const savePersonal = async (e) => {
     e.preventDefault();
     const { data: { user } } = await supabase.auth.getUser();
-
     if (role === "doctor") {
       const { error } = await supabase.from("doctors").update({
         first_name: personal.firstName,
         last_name: personal.lastName,
         phone: personal.phone,
-        id_number: personal.idNumber,
       }).eq("id", user.id);
       if (error) { alert("Error: " + error.message); return; }
     } else {
@@ -96,7 +106,7 @@ function Profile() {
       }).eq("id", user.id);
       if (error) { alert("Error: " + error.message); return; }
     }
-    alert("Personal details updated successfully!");
+    alert("Details updated successfully!");
   };
 
   const saveQualification = async (e) => {
@@ -112,10 +122,7 @@ function Profile() {
 
   const savePassword = async (e) => {
     e.preventDefault();
-    if (password.newPass !== password.confirm) {
-      alert("Passwords do not match!");
-      return;
-    }
+    if (password.newPass !== password.confirm) { alert("Passwords do not match!"); return; }
     const { error } = await supabase.auth.updateUser({ password: password.newPass });
     if (error) { alert("Error: " + error.message); return; }
     alert("Password changed successfully!");
@@ -126,6 +133,21 @@ function Profile() {
     await supabase.auth.signOut();
     navigate("/");
   };
+
+  const getDutyStatusBadge = (duty) => {
+    if (duty.completed) {
+      const labels = { satisfactory: "✅ Satisfactory", unsatisfactory: "⚠️ Unsatisfactory", late: "🕐 Late", absent: "❌ Absent" };
+      return <span className="history-badge completed">{labels[duty.review_status] || "✅ Completed"}</span>;
+    }
+    if (duty.booking_status === "confirmed") return <span className="history-badge confirmed">✅ Confirmed</span>;
+    if (duty.booking_status === "reopened") return <span className="history-badge reopened">🔄 Re-opened</span>;
+    if (duty.booking_status === "pending_verification") return <span className="history-badge pending">⏳ Pending</span>;
+    return <span className="history-badge open">Open</span>;
+  };
+
+  const completedDuties = dutyHistory.filter(d => d.completed);
+  const upcomingDuties = dutyHistory.filter(d => !d.completed && d.booking_status === "confirmed");
+  const pendingDuties = dutyHistory.filter(d => !d.completed && d.booking_status !== "confirmed");
 
   if (loading) return <p style={{ textAlign: "center", padding: 40, color: "#888" }}>Loading...</p>;
 
@@ -140,23 +162,8 @@ function Profile() {
       </div>
 
       <div className="profile-card">
-        <div className="photo-section">
-          <div className="photo-circle">
-            {photo ? (
-              <img src={URL.createObjectURL(photo)} alt="Profile" />
-            ) : (
-              <span>👤</span>
-            )}
-          </div>
-          <label className="photo-upload-btn">
-            Change Photo
-            <input
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => setPhoto(e.target.files[0])}
-            />
-          </label>
+        <div className="photo-circle">
+          <span>👤</span>
         </div>
         <div className="profile-name">
           <h2>
@@ -169,25 +176,19 @@ function Profile() {
       </div>
 
       <div className="tabs">
-        <button
-          className={activeTab === "personal" ? "active" : ""}
-          onClick={() => setActiveTab("personal")}
-        >
+        <button className={activeTab === "personal" ? "active" : ""} onClick={() => setActiveTab("personal")}>
           Personal Details
         </button>
         {role === "doctor" && (
-          <button
-            className={activeTab === "qualification" ? "active" : ""}
-            onClick={() => setActiveTab("qualification")}
-          >
+          <button className={activeTab === "qualification" ? "active" : ""} onClick={() => setActiveTab("qualification")}>
             Qualification
           </button>
         )}
-        <button
-          className={activeTab === "password" ? "active" : ""}
-          onClick={() => setActiveTab("password")}
-        >
+        <button className={activeTab === "password" ? "active" : ""} onClick={() => setActiveTab("password")}>
           Change Password
+        </button>
+        <button className={activeTab === "history" ? "active" : ""} onClick={() => { setActiveTab("history"); fetchHistory(); }}>
+          {role === "doctor" ? "Duty History" : "Duty History"}
         </button>
       </div>
 
@@ -212,10 +213,6 @@ function Profile() {
               <div className="form-group">
                 <label>Phone Number</label>
                 <input value={personal.phone} onChange={(e) => setPersonal({ ...personal, phone: e.target.value })} />
-              </div>
-              <div className="form-group">
-                <label>ID / Passport Number</label>
-                <input value={personal.idNumber} onChange={(e) => setPersonal({ ...personal, idNumber: e.target.value })} />
               </div>
             </>
           ) : (
@@ -272,6 +269,126 @@ function Profile() {
           </div>
           <button type="submit" className="save-btn">Change Password</button>
         </form>
+      )}
+
+      {activeTab === "history" && (
+        <div className="history-section">
+          {historyLoading ? (
+            <p style={{ color: "#888", textAlign: "center", padding: 40 }}>Loading history...</p>
+          ) : dutyHistory.length === 0 ? (
+            <p style={{ color: "#888", textAlign: "center", padding: 40 }}>No duty history yet.</p>
+          ) : (
+            <>
+              <div className="history-stats">
+                <div className="history-stat">
+                  <h3>{completedDuties.length}</h3>
+                  <p>Completed</p>
+                </div>
+                <div className="history-stat">
+                  <h3>{upcomingDuties.length}</h3>
+                  <p>Upcoming</p>
+                </div>
+                <div className="history-stat">
+                  <h3>{pendingDuties.length}</h3>
+                  <p>Pending</p>
+                </div>
+                {role === "doctor" && (
+                  <div className="history-stat green">
+                    <h3>₹{completedDuties.reduce((sum, d) => sum + (d.doctor_pay || Math.round((d.pay || 0) * 0.8)), 0).toLocaleString()}</h3>
+                    <p>Total Earned</p>
+                  </div>
+                )}
+                {role === "hospital" && (
+                  <div className="history-stat green">
+                    <h3>{dutyHistory.length}</h3>
+                    <p>Total Posted</p>
+                  </div>
+                )}
+              </div>
+
+              {upcomingDuties.length > 0 && (
+                <>
+                  <h3 className="history-section-title">📅 Upcoming Duties</h3>
+                  {upcomingDuties.map(duty => (
+                    <div key={duty.id} className="history-card upcoming">
+                      <div className="history-card-header">
+                        <div>
+                          <p className="history-card-title">
+                            {role === "doctor"
+                              ? duty.hospitals?.hospital_name
+                              : duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "Unbooked"}
+                          </p>
+                          <p className="history-card-sub">
+                            {role === "doctor" ? duty.hospitals?.address : duty.qualification}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p className="history-card-pay">₹{(role === "doctor" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
+                          {getDutyStatusBadge(duty)}
+                        </div>
+                      </div>
+                      <p className="history-card-date">📅 {duty.date} &nbsp; 🕐 {duty.start_time} - {duty.end_time}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {pendingDuties.length > 0 && (
+                <>
+                  <h3 className="history-section-title">⏳ Pending Duties</h3>
+                  {pendingDuties.map(duty => (
+                    <div key={duty.id} className="history-card pending-card">
+                      <div className="history-card-header">
+                        <div>
+                          <p className="history-card-title">
+                            {role === "doctor"
+                              ? duty.hospitals?.hospital_name
+                              : duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "Unbooked"}
+                          </p>
+                          <p className="history-card-sub">
+                            {role === "doctor" ? duty.hospitals?.address : duty.qualification}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p className="history-card-pay">₹{(role === "doctor" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
+                          {getDutyStatusBadge(duty)}
+                        </div>
+                      </div>
+                      <p className="history-card-date">📅 {duty.date} &nbsp; 🕐 {duty.start_time} - {duty.end_time}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {completedDuties.length > 0 && (
+                <>
+                  <h3 className="history-section-title">✅ Completed Duties</h3>
+                  {completedDuties.map(duty => (
+                    <div key={duty.id} className="history-card completed-card">
+                      <div className="history-card-header">
+                        <div>
+                          <p className="history-card-title">
+                            {role === "doctor"
+                              ? duty.hospitals?.hospital_name
+                              : duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—"}
+                          </p>
+                          <p className="history-card-sub">
+                            {role === "doctor" ? duty.hospitals?.address : duty.qualification}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p className="history-card-pay">₹{(role === "doctor" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
+                          {getDutyStatusBadge(duty)}
+                        </div>
+                      </div>
+                      <p className="history-card-date">📅 {duty.date} &nbsp; 🕐 {duty.start_time} - {duty.end_time}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );
