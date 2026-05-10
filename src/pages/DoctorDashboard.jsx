@@ -194,12 +194,15 @@ function DoctorDashboard() {
                   <span className="pay">₹{(cr.locum_duties?.doctor_pay || Math.round((cr.locum_duties?.pay || 0) * 0.8)).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
-                  <p>📍 {cr.locum_duties?.hospitals?.address}</p>
-                  <p>📅 {cr.locum_duties?.date}</p>
-                  <p>🕐 {cr.locum_duties?.start_time} - {cr.locum_duties?.end_time}</p>
-                  <p>🎓 {cr.locum_duties?.qualification}</p>
-                  <p>📋 Reason: {cr.reason}</p>
-                </div>
+  <p>📍 {duty.hospitals?.address || "Address not provided"}</p>
+  <p>📅 {duty.date}</p>
+  <p>🕐 {duty.start_time} - {duty.end_time}</p>
+  <p>🎓 {duty.qualifications && duty.qualifications.length > 1
+    ? duty.qualifications.join(", ")
+    : duty.qualification}
+  </p>
+  {duty.notes && <p>📝 {duty.notes}</p>}
+</div>
                 <button
                   className="book-btn"
                   style={{ background: "#27ae60" }}

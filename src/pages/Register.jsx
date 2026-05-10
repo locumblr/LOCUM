@@ -12,6 +12,7 @@ const qualifications = [
   "MD - Dermatology",
   "MD - Anaesthesiology",
   "MD - Radiology",
+  "MD - Radiology with PCPNDT Certification",
   "MD - Pathology",
   "MD - Microbiology",
   "MD - Biochemistry",
@@ -47,10 +48,11 @@ const qualifications = [
   "Diploma in Ophthalmology (DO)",
   "Diploma in ENT",
   "Diploma in Radiology (DMRD)",
+  "Diploma in Radiology (DMRD) with PCPNDT Certification",
+  "PCPNDT Certified Sonologist",
   "Fellowship in Emergency Medicine (FCEM)",
   "Other",
 ];
-
 function TermsBox({ agreed, setAgreed }) {
   return (
     <div

@@ -11,6 +11,7 @@ const allQualifications = [
   "MD - Dermatology",
   "MD - Anaesthesiology",
   "MD - Radiology",
+  "MD - Radiology with PCPNDT Certification",
   "MD - Pathology",
   "MD - Microbiology",
   "MD - Biochemistry",
@@ -46,6 +47,8 @@ const allQualifications = [
   "Diploma in Ophthalmology (DO)",
   "Diploma in ENT",
   "Diploma in Radiology (DMRD)",
+  "Diploma in Radiology (DMRD) with PCPNDT Certification",
+  "PCPNDT Certified Sonologist",
   "Fellowship in Emergency Medicine (FCEM)",
   "Other",
 ];
@@ -54,6 +57,13 @@ const emptyForm = {
   date: "", start_time: "", end_time: "",
   qualifications: [], pay: "", notes: "",
 };
+
+const isRadiology = (qualifications) =>
+  qualifications.some(q =>
+    q.toLowerCase().includes("radio") ||
+    q.toLowerCase().includes("pcpndt") ||
+    q.toLowerCase().includes("sonolog")
+  );
 
 function HospitalDashboard() {
   const navigate = useNavigate();
@@ -171,6 +181,7 @@ function HospitalDashboard() {
       alert("Locum duty posted successfully!");
       setForm(emptyForm);
       setShowForm(false);
+      setShowQualDropdown(false);
       fetchDuties();
     }
     setSubmitting(false);
@@ -248,7 +259,30 @@ function HospitalDashboard() {
           </div>
 
           <div className="form-group">
-            <label>Required Qualifications {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>}</label>
+            <label>
+              Required Qualifications{" "}
+              {form.qualifications.length > 0 && (
+                <span style={{ color: "#27ae60", fontSize: 13 }}>
+                  ({form.qualifications.length} selected)
+                </span>
+              )}
+            </label>
+
+            {isRadiology(form.qualifications) && (
+              <div style={{
+                background: "#fff8e1",
+                border: "1px solid #ffcc02",
+                borderRadius: 8,
+                padding: "10px 14px",
+                fontSize: 13,
+                color: "#795500",
+                marginBottom: 8,
+                lineHeight: 1.5,
+              }}>
+                ⚠️ <strong>PCPNDT Notice:</strong> Radiologists performing USG/Ultrasound procedures must hold a valid <strong>PCPNDT registration</strong> as required by the Pre-Conception and Pre-Natal Diagnostic Techniques Act, 1994. Please select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
+              </div>
+            )}
+
             <div className="qual-dropdown-container">
               <div
                 className="qual-dropdown-trigger"
@@ -277,11 +311,13 @@ function HospitalDashboard() {
                 </div>
               )}
             </div>
+
             {form.qualifications.length > 0 && (
               <div className="selected-quals">
                 {form.qualifications.map(q => (
                   <span key={q} className="qual-tag">
-                    {q} <button type="button" onClick={() => toggleQualification(q)}>×</button>
+                    {q}
+                    <button type="button" onClick={() => toggleQualification(q)}>×</button>
                   </span>
                 ))}
               </div>
@@ -309,6 +345,7 @@ function HospitalDashboard() {
             <label>Additional Notes (optional)</label>
             <textarea name="notes" placeholder="Any special requirements..." onChange={handle} value={form.notes} rows={3} />
           </div>
+
           <button type="submit" className="submit-btn" disabled={submitting}>
             {submitting ? "Posting..." : "Post Duty"}
           </button>
@@ -326,16 +363,29 @@ function HospitalDashboard() {
           {duties.map((duty) => (
             <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "booked" : duty.booking_status === "reopened" ? "reopened-card" : duty.booked ? "booked" : ""}`}>
               <div className="duty-header">
-                <h3>{duty.qualifications ? `${duty.qualifications.length} Qualification${duty.qualifications.length > 1 ? "s" : ""}` : duty.qualification}</h3>
+                <h3>
+                  {duty.qualifications && duty.qualifications.length > 1
+                    ? `${duty.qualifications.length} Qualifications`
+                    : duty.qualification}
+                </h3>
                 <span className="pay">₹{duty.gross_pay || duty.pay}</span>
               </div>
               <div className="duty-details">
                 <p>📅 {duty.date}</p>
                 <p>🕐 {duty.start_time} - {duty.end_time}</p>
-                {duty.qualifications && duty.qualifications.length > 0 && (
+                {duty.qualifications && duty.qualifications.length > 1 && (
                   <div style={{ marginTop: 6 }}>
                     {duty.qualifications.map(q => (
-                      <span key={q} style={{ display: "inline-block", background: "#e3f2fd", color: "#1565c0", borderRadius: 20, padding: "2px 10px", fontSize: 12, marginRight: 4, marginBottom: 4 }}>{q}</span>
+                      <span key={q} style={{
+                        display: "inline-block",
+                        background: "#e3f2fd",
+                        color: "#1565c0",
+                        borderRadius: 20,
+                        padding: "2px 10px",
+                        fontSize: 12,
+                        marginRight: 4,
+                        marginBottom: 4,
+                      }}>{q}</span>
                     ))}
                   </div>
                 )}
