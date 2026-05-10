@@ -55,3 +55,6 @@
 .selected-quals { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .qual-tag { display: flex; align-items: center; gap: 4px; background: #1e3a5f; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
 .qual-tag button { background: none; border: none; color: white; cursor: pointer; font-size: 14px; padding: 0; line-height: 1; }
+.post-section { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+.nurse-btn { background: #6a0dad !important; }
+.nurse-btn:hover { background: #5a0b9d !important; }

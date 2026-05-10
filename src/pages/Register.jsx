@@ -87,11 +87,16 @@ function Register() {
       <h1>Create Account</h1>
       <p>Register as a Doctor or Hospital</p>
       {!role && (
-        <div className="role-select">
-          <button onClick={() => setRole("doctor")}>I am a Doctor</button>
-          <button onClick={() => setRole("hospital")}>I am a Hospital</button>
-        </div>
-      )}
+  <div className="role-select">
+    <button onClick={() => setRole("doctor")}>I am a Doctor</button>
+    <button onClick={() => setRole("nurse")}>I am a Nurse</button>
+    <button onClick={() => setRole("hospital")}>I am a Hospital</button>
+  </div>
+)}
+
+{role === "doctor" && <DoctorForm navigate={navigate} />}
+{role === "nurse" && <NurseForm navigate={navigate} />}
+{role === "hospital" && <HospitalForm navigate={navigate} />}
       {role === "doctor" && <DoctorForm navigate={navigate} />}
       {role === "hospital" && <HospitalForm navigate={navigate} />}
       {role && (
@@ -261,5 +266,104 @@ function HospitalForm({ navigate }) {
     </form>
   );
 }
+function NurseForm({ navigate }) {
+  const [form, setForm] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    qualification: "", experience: "",
+    password: "", confirmPassword: "",
+  });
+  const [certificate, setCertificate] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [agreed, setAgreed] = useState(false);
 
+  const nursingQualifications = [
+    "GNM (General Nursing & Midwifery)",
+    "B.Sc Nursing",
+    "Post Basic B.Sc Nursing",
+    "M.Sc Nursing",
+    "Critical Care Nursing",
+    "Operation Theatre Nursing",
+    "Emergency & Trauma Nursing",
+    "Paediatric Nursing",
+    "Oncology Nursing",
+    "Dialysis Nursing",
+    "ICU Nursing",
+    "NICU Nursing",
+    "PICU Nursing",
+    "Midwifery",
+    "Community Health Nursing",
+    "Psychiatric Nursing",
+    "Other",
+  ];
+
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!agreed) { setError("You must agree to the Terms of Service and Privacy Policy to continue."); return; }
+    if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
+    if (!certificate) { setError("Please upload your certificate."); return; }
+    setLoading(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: { data: { role: "nurse" } }
+      });
+      if (authError) throw authError;
+      const fileExt = certificate.name.split('.').pop();
+      const fileName = `nurses/${authData.user.id}/certificate.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, certificate);
+      if (uploadError) throw uploadError;
+      const { error: dbError } = await supabase.from("nurses").insert({
+        id: authData.user.id,
+        first_name: form.firstName,
+        last_name: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        qualification: form.qualification,
+        experience: parseInt(form.experience),
+        document_url: fileName,
+        status: "active",
+      });
+      if (dbError) throw dbError;
+      alert("Registration successful! You can now log in to your account.");
+      navigate("/login");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="register-form">
+      <h2>Nurse Registration</h2>
+      {error && <p className="error-msg">{error}</p>}
+      <div className="form-row">
+        <input name="firstName" placeholder="First Name" required onChange={handle} />
+        <input name="lastName" placeholder="Last Name" required onChange={handle} />
+      </div>
+      <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
+      <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
+      <select name="qualification" required onChange={handle} defaultValue="">
+        <option value="" disabled>Select Your Nursing Qualification</option>
+        {nursingQualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
+      </select>
+      <input name="experience" placeholder="Years of Experience" type="number" required onChange={handle} />
+      <label className="file-label">
+        Upload Certificate / Proof of Qualification
+        <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
+      </label>
+      <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
+      <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
+      <TermsBox agreed={agreed} setAgreed={setAgreed} />
+      <button type="submit" disabled={loading || !agreed}>
+        {loading ? "Submitting..." : "Create Account"}
+      </button>
+    </form>
+  );
+}
 export default Register;

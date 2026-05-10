@@ -16,6 +16,8 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Support from "./pages/Support";
 import Help from "./pages/Help";
+import NurseDashboard from "./pages/NurseDashboard";
+import NurseLocums from "./pages/NurseLocums";
 
 function App() {
   return (
@@ -37,6 +39,9 @@ function App() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/support" element={<Support />} />
+        <Route path="/nurse/dashboard" element={<NurseDashboard />} />
+<Route path="/nurse/locums" element={<NurseLocums />} />
+<Route path="/nurse/profile" element={<Profile />} />
 <Route path="/help" element={<Help />} />
       </Routes>
     </BrowserRouter>

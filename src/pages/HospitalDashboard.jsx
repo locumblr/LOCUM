@@ -52,7 +52,25 @@ const allQualifications = [
   "Fellowship in Emergency Medicine (FCEM)",
   "Other",
 ];
-
+const nursingQualifications = [
+  "GNM (General Nursing & Midwifery)",
+  "B.Sc Nursing",
+  "Post Basic B.Sc Nursing",
+  "M.Sc Nursing",
+  "Critical Care Nursing",
+  "Operation Theatre Nursing",
+  "Emergency & Trauma Nursing",
+  "Paediatric Nursing",
+  "Oncology Nursing",
+  "Dialysis Nursing",
+  "ICU Nursing",
+  "NICU Nursing",
+  "PICU Nursing",
+  "Midwifery",
+  "Community Health Nursing",
+  "Psychiatric Nursing",
+  "Other",
+];
 const emptyForm = {
   date: "", start_time: "", end_time: "",
   qualifications: [], pay: "", notes: "",
@@ -69,7 +87,7 @@ function HospitalDashboard() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
   const [form, setForm] = useState(emptyForm);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(null)
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [hospitalName, setHospitalName] = useState("");
@@ -163,8 +181,8 @@ function HospitalDashboard() {
       completed: false,
       booking_status: "open",
       payment_status: "unpaid",
+      duty_type: showForm,
     });
-
     if (error) {
       alert("Error posting duty: " + error.message);
     } else {
@@ -180,7 +198,7 @@ function HospitalDashboard() {
       }
       alert("Locum duty posted successfully!");
       setForm(emptyForm);
-      setShowForm(false);
+      setShowForm(null);
       setShowQualDropdown(false);
       fetchDuties();
     }
@@ -235,13 +253,21 @@ function HospitalDashboard() {
       )}
 
       <div className="post-section">
-        <button className="post-btn" onClick={() => setShowForm(!showForm)}>
-          {showForm ? "Cancel" : "+ Post New Locum Duty"}
-        </button>
-      </div>
+  <button className="post-btn" onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); }}>
+    {showForm === "doctor" ? "Cancel" : "+ Post Doctor Locum"}
+  </button>
+  <button className="post-btn nurse-btn" onClick={() => { setShowForm(showForm === "nurse" ? null : "nurse"); }}>
+    {showForm === "nurse" ? "Cancel" : "+ Post Nurse Locum"}
+  </button>
+</div>
 
       {showForm && (
-        <form onSubmit={submit} className="duty-form">
+  <form onSubmit={submit} className="duty-form">
+    {showForm === "nurse" && (
+      <div style={{ background: "#f3e5f5", border: "1px solid #6a0dad", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#4a0080" }}>
+        💜 You are posting a <strong>Nurse Locum</strong> duty
+      </div>
+    )}
           <h2>Post a Locum Duty</h2>
           <div className="form-row">
             <div className="form-group">
@@ -297,7 +323,7 @@ function HospitalDashboard() {
               </div>
               {showQualDropdown && (
                 <div className="qual-dropdown-list">
-                  {allQualifications.map((q) => (
+                  {(showForm === "nurse" ? nursingQualifications : allQualifications).map((q) => (
                     <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}>
                       <input
                         type="checkbox"
