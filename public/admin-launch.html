@@ -1,18 +1,75 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LOCUM Admin</title>
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="LOCUM Admin" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <script>
-      window.location.replace("https://project-1qlxe.vercel.app/admin/login");
-    </script>
-  </head>
-  <body>
-    <p style="font-family: Arial; text-align: center; margin-top: 40px;">Redirecting to admin...</p>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOCUM Admin</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="LOCUM Admin" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f4f7fb; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: white; border-radius: 16px; padding: 40px; width: 90%; max-width: 400px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); text-align: center; }
+    img { width: 140px; margin-bottom: 16px; }
+    p { color: #888; margin-bottom: 24px; font-size: 15px; }
+    input { width: 100%; padding: 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 14px; box-sizing: border-box; }
+    button { width: 100%; padding: 14px; background: #1e3a5f; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    button:disabled { background: #aaa; }
+    .error { background: #fce4ec; color: #c62828; padding: 10px; border-radius: 8px; margin-bottom: 14px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/logo.png" alt="LOCUM" onerror="this.style.display='none'" />
+    <p>Admin Login</p>
+    <div id="error" class="error" style="display:none"></div>
+    <input type="email" id="email" placeholder="Admin Email" />
+    <input type="password" id="password" placeholder="Password" />
+    <button id="btn" onclick="login()">Login</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const { createClient } = supabase;
+    const client = createClient(
+      'https://xdadenailnapeskzacyt.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYWRlbmFpbG5hcGVza3phY3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzYyNDAsImV4cCI6MjA5MzU1MjI0MH0.RCYJXt6iyoRRRU_b7Ku_OeZIFtXLZGIKloVnSSvKddY'
+    );
+
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('btn');
+      const error = document.getElementById('error');
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+      error.style.display = 'none';
+
+      try {
+        const { data, error: authError } = await client.auth.signInWithPassword({ email, password });
+        if (authError) throw authError;
+
+        const { data: admin } = await client.from('admins').select('id').eq('id', data.user.id).single();
+        if (!admin) {
+          await client.auth.signOut();
+          throw new Error('Not an admin account.');
+        }
+
+        window.location.href = 'https://project-1qlxe.vercel.app/admin';
+      } catch (err) {
+        error.textContent = err.message;
+        error.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Login';
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') login();
+    });
+  </script>
+</body>
 </html>
