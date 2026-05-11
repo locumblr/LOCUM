@@ -16,18 +16,21 @@ function HospitalLocums() {
     fetchDuties();
   }, []);
 
-  const fetchDuties = async () => {
+ const fetchDuties = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
     const { data, error } = await supabase
       .from("locum_duties")
-      .select("*, doctors(id, first_name, last_name, phone, email, qualification, experience, document_url), nurses(id, first_name, last_name, phone, email, qualification, experience, document_url)")
+      .select(`
+        *,
+        doctors(id, first_name, last_name, phone, email, qualification, experience, document_url),
+        nurses(id, first_name, last_name, phone, email, qualification, experience, document_url)
+      `)
       .eq("hospital_id", user.id)
       .order("date", { ascending: false });
     if (!error) setDuties(data || []);
     setLoading(false);
   };
-
   const viewDocument = async (documentUrl) => {
     if (!documentUrl) { alert("No document uploaded by this professional."); return; }
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(documentUrl, 60);
