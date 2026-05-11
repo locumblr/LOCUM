@@ -16,7 +16,6 @@ function Landing() {
           <a href="#for-doctors">Doctors</a>
           <a href="#for-nurses">Nurses</a>
           <a href="#for-hospitals">Hospitals</a>
-          <a href="#pricing">Pricing</a>
           <button className="nav-login-btn" onClick={() => navigate("/login")}>Login</button>
           <button className="nav-cta-btn" onClick={() => navigate("/register")}>Let's Get Started</button>
         </div>
@@ -177,34 +176,6 @@ function Landing() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className="section" id="pricing">
-        <div className="section-inner center">
-          <div className="section-label">Pricing</div>
-          <h2>Simple, transparent pricing.</h2>
-          <p className="section-sub">No subscription fees. No setup costs. We only earn when you do.</p>
-          <div className="pricing-card">
-            <h3>20% platform fee</h3>
-            <p>Per confirmed locum duty, paid by the hospital. Doctors and nurses always receive 80% of the posted duty pay.</p>
-            <div className="pricing-example">
-              <div className="pricing-row">
-                <span>Duty posted at</span>
-                <span>₹10,000</span>
-              </div>
-              <div className="pricing-row">
-                <span>Doctor / Nurse receives</span>
-                <span className="green">₹8,000</span>
-              </div>
-              <div className="pricing-row">
-                <span>LOCUM platform fee</span>
-                <span className="blue">₹2,000</span>
-              </div>
-            </div>
-            <p style={{ fontSize: 13, color: "#888", marginTop: 16 }}>No hidden charges. No monthly fees. Cancel anytime.</p>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Banner */}
       <section className="cta-banner">
         <div className="section-inner center">
@@ -228,7 +199,6 @@ function Landing() {
               <a href="#for-doctors">For Doctors</a>
               <a href="#for-nurses">For Nurses</a>
               <a href="#for-hospitals">For Hospitals</a>
-              <a href="#pricing">Pricing</a>
             </div>
             <div className="footer-col">
               <h4>Company</h4>

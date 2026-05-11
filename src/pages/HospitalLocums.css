@@ -5,7 +5,12 @@
 .header-buttons button { padding: 10px 20px; border: none; border-radius: 8px; background: #1e3a5f; color: white; cursor: pointer; font-size: 14px; transition: 0.3s; }
 .header-buttons button:hover { background: #16304d; }
 .header-buttons button.logout { background: #e74c3c; }
-.header-buttons button.logout:hover { background: #c0392b; }
+.duty-type-tabs { display: flex; gap: 4px; background: #f0f4f8; border-radius: 10px; padding: 4px; margin-bottom: 24px; width: fit-content; }
+.duty-type-tabs button { padding: 10px 24px; border: none; border-radius: 8px; cursor: pointer; background: transparent; color: #555; font-size: 14px; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+.duty-type-tabs button.active { background: #1e3a5f; color: white; }
+.duty-type-tabs button.nurse-tab.active { background: #6a0dad; }
+.tab-count { background: rgba(255,255,255,0.3); border-radius: 20px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+.duty-type-tabs button:not(.active) .tab-count { background: #1e3a5f; color: white; }
 .empty-state { text-align: center; padding: 60px 20px; color: #888; }
 .empty-state p { font-size: 18px; margin-bottom: 20px; }
 .empty-state button { padding: 12px 28px; background: #1e3a5f; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
@@ -14,6 +19,7 @@
 .duty-card.booked { border-left: 4px solid #f39c12; }
 .duty-card.confirmed { border-left: 4px solid #27ae60; }
 .duty-card.completed { border-left: 4px solid #9e9e9e; opacity: 0.85; }
+.duty-card.nurse-card { border-top: 2px solid #6a0dad; }
 .duty-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 10px; }
 .duty-header h3 { color: #1e3a5f; font-size: 15px; flex: 1; }
 .pay { background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 14px; white-space: nowrap; }
@@ -22,6 +28,7 @@
 .status-open { background: #e3f2fd; color: #1565c0; }
 .status-pending { background: #fff3e0; color: #e65100; }
 .status-confirmed { background: #e8f5e9; color: #2e7d32; }
+.status-reopened { background: #fff3e0; color: #e65100; }
 .review-satisfactory { background: #e8f5e9; color: #2e7d32; }
 .review-unsatisfactory { background: #fff3e0; color: #e65100; }
 .review-late { background: #fff3e0; color: #e65100; }
