@@ -18,12 +18,14 @@ import Support from "./pages/Support";
 import Help from "./pages/Help";
 import NurseDashboard from "./pages/NurseDashboard";
 import NurseLocums from "./pages/NurseLocums";
+import Landing from "./pages/Landing";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Landing />} />
+<Route path="/app" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
