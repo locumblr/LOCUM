@@ -12,7 +12,9 @@ function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [billing, setBilling] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
 
   useEffect(() => {
     checkAdmin();
@@ -39,21 +41,172 @@ function AdminPanel() {
 
   const fetchBilling = async () => {
     setBillingLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("locum_duties")
-      .select("*, hospitals(hospital_name, email, phone), doctors(first_name, last_name)")
+      .select("*, hospitals(hospital_name, email, phone), doctors(first_name, last_name), nurses(first_name, last_name)")
       .eq("booked", true)
       .order("date", { ascending: false });
-    if (!error) setBilling(data || []);
+    setBilling(data || []);
+
+    const { data: inv } = await supabase
+      .from("monthly_invoices")
+      .select("*, hospitals(hospital_name, email, phone)")
+      .order("created_at", { ascending: false });
+    setInvoices(inv || []);
     setBillingLoading(false);
   };
 
-  const markAsPaid = async (dutyId) => {
-    const { error } = await supabase
-      .from("locum_duties")
-      .update({ payment_status: "paid", payment_cleared_at: new Date().toISOString() })
-      .eq("id", dutyId);
-    if (error) { alert("Error: " + error.message); return; }
+  const getCurrentBillingMonth = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  const getMonthLabel = (monthStr) => {
+    const [year, month] = monthStr.split("-");
+    const date = new Date(year, month - 1);
+    return date.toLocaleString("default", { month: "long", year: "numeric" });
+  };
+
+  const generateMonthlyInvoices = async () => {
+    const confirmed = window.confirm("Generate invoices for all hospitals for this month? This will notify all hospitals with outstanding duties.");
+    if (!confirmed) return;
+    setGeneratingInvoice(true);
+
+    const billingMonth = getCurrentBillingMonth();
+    const now = new Date();
+    const dueDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-15`;
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 15);
+    const dueDateStr = nextMonth.toISOString().split("T")[0];
+
+    // Get all unpaid completed duties grouped by hospital
+    const unpaidDuties = billing.filter(d =>
+      d.payment_status !== "paid" &&
+      d.completed
+    );
+
+    // Group by hospital
+    const byHospital = unpaidDuties.reduce((acc, duty) => {
+      const hid = duty.hospitals ? duty.hospital_id : null;
+      if (!hid) return acc;
+      if (!acc[hid]) {
+        acc[hid] = {
+          hospital_id: hid,
+          hospital: duty.hospitals,
+          duties: [],
+          total_gross: 0,
+          total_platform_fee: 0,
+        };
+      }
+      acc[hid].duties.push(duty);
+      acc[hid].total_gross += duty.gross_pay || duty.pay || 0;
+      acc[hid].total_platform_fee += duty.platform_fee || 0;
+      return acc;
+    }, {});
+
+    let count = 0;
+    for (const hid of Object.keys(byHospital)) {
+      const h = byHospital[hid];
+      if (h.duties.length === 0) continue;
+
+      // Check if invoice already exists for this month
+      const { data: existing } = await supabase
+        .from("monthly_invoices")
+        .select("id")
+        .eq("hospital_id", hid)
+        .eq("billing_month", billingMonth)
+        .single();
+
+      if (!existing) {
+        await supabase.from("monthly_invoices").insert({
+          hospital_id: hid,
+          billing_month: billingMonth,
+          total_duties: h.duties.length,
+          total_gross: h.total_gross,
+          total_platform_fee: h.total_platform_fee,
+          fine_amount: 0,
+          total_due: h.total_platform_fee,
+          status: "unpaid",
+          due_date: dueDateStr,
+        });
+
+        // Send notification to hospital
+        await supabase.from("notifications").insert({
+          user_id: hid,
+          title: "📋 Monthly Invoice Generated",
+          message: `Your invoice for ${getMonthLabel(billingMonth)} is ready. Total due: ₹${h.total_platform_fee.toLocaleString()}. Payment due by 15th of next month. Late payments attract a fine of ₹500 per week.`,
+        });
+        count++;
+      }
+    }
+
+    alert(`${count} invoice(s) generated and hospitals notified!`);
+    fetchBilling();
+    setGeneratingInvoice(false);
+  };
+
+  const addWeeklyFine = async (invoiceId, currentFine, currentTotal, platformFee) => {
+    const newFine = currentFine + 500;
+    const newTotal = platformFee + newFine;
+    await supabase.from("monthly_invoices").update({
+      fine_amount: newFine,
+      total_due: newTotal,
+    }).eq("id", invoiceId);
+
+    // Get hospital id
+    const invoice = invoices.find(i => i.id === invoiceId);
+    if (invoice) {
+      await supabase.from("notifications").insert({
+        user_id: invoice.hospital_id,
+        title: "⚠️ Late Payment Fine Added",
+        message: `A late payment fine of ₹500 has been added to your outstanding invoice. New total due: ₹${newTotal.toLocaleString()}. Please clear dues immediately to avoid account suspension.`,
+      });
+    }
+    fetchBilling();
+  };
+
+  const freezeForNonPayment = async (hospitalId, invoiceId) => {
+    const confirmed = window.confirm("Freeze this hospital's account for non-payment?");
+    if (!confirmed) return;
+    await supabase.from("hospitals").update({ status: "frozen" }).eq("id", hospitalId);
+    await supabase.from("notifications").insert({
+      user_id: hospitalId,
+      title: "🔴 Account Frozen — Payment Overdue",
+      message: "Your account has been frozen due to outstanding payment. Please clear all dues and contact LOCUM admin to unfreeze your account.",
+    });
+    alert("Hospital account frozen!");
+    fetchData();
+    fetchBilling();
+  };
+
+  const markInvoicePaid = async (invoiceId, hospitalId) => {
+    await supabase.from("monthly_invoices").update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+    }).eq("id", invoiceId);
+
+    // Unfreeze hospital if frozen
+    const hospital = hospitals.find(h => h.id === hospitalId);
+    if (hospital?.status === "frozen") {
+      await supabase.from("hospitals").update({ status: "active" }).eq("id", hospitalId);
+      await supabase.from("notifications").insert({
+        user_id: hospitalId,
+        title: "✅ Account Unfrozen — Payment Received",
+        message: "Your payment has been received and your account has been reactivated. Thank you!",
+      });
+    }
+
+    // Mark all duties for this hospital as paid
+    const invoice = invoices.find(i => i.id === invoiceId);
+    if (invoice) {
+      await supabase.from("locum_duties")
+        .update({ payment_status: "paid", payment_cleared_at: new Date().toISOString() })
+        .eq("hospital_id", hospitalId)
+        .eq("completed", true)
+        .eq("payment_status", "unpaid");
+    }
+
+    alert("Invoice marked as paid! Hospital account active.");
+    fetchData();
     fetchBilling();
   };
 
@@ -67,7 +220,7 @@ function AdminPanel() {
           body: {
             to: hospital.email,
             subject: "Your LOCUM Hospital Account Has Been Approved!",
-            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;"><h1 style="color: #1e3a5f;">LOCUM</h1><h2>Congratulations, ${hospital.hospital_name}!</h2><p>Your hospital account has been verified and approved by our admin team.</p><p>You can now log in to the LOCUM platform and start posting locum duties.</p><a href="https://project-1qlxe.vercel.app/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a><p style="margin-top: 30px; color: #888; font-size: 13px;">If you have any questions, please contact us at locum.blr@gmail.com</p></div>`,
+            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;"><h1 style="color: #1e3a5f;">LOCUM</h1><h2>Congratulations, ${hospital.hospital_name}!</h2><p>Your hospital account has been verified and approved.</p><a href="https://project-1qlxe.vercel.app/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a></div>`,
           },
         });
       }
@@ -83,7 +236,7 @@ function AdminPanel() {
   };
 
   const deleteAccount = async (table, id) => {
-    const confirmed = window.confirm("Are you sure you want to permanently delete this account? This cannot be undone.");
+    const confirmed = window.confirm("Are you sure you want to permanently delete this account?");
     if (!confirmed) return;
     if (table === "hospitals") {
       await supabase.from("locum_duties").delete().eq("hospital_id", id).eq("completed", false);
@@ -113,22 +266,9 @@ function AdminPanel() {
 
   const flaggedDoctors = doctors.filter(d => d.flagged);
   const flaggedNurses = nurses.filter(n => n.flagged);
-  const frozenHospitals = hospitals.filter(h => h.status === "frozen");
   const pendingHospitals = hospitals.filter(h => h.status === "pending");
-
-  const totalOwed = billing.filter(d => d.payment_status !== "paid").reduce((sum, d) => sum + (d.platform_fee || 0), 0);
-  const totalPaid = billing.filter(d => d.payment_status === "paid").reduce((sum, d) => sum + (d.platform_fee || 0), 0);
-
-  const billingByHospital = billing.reduce((acc, duty) => {
-    if (duty.payment_status === "paid") return acc;
-    const hospitalName = duty.hospitals?.hospital_name || "Unknown";
-    if (!acc[hospitalName]) {
-      acc[hospitalName] = { hospital: duty.hospitals, duties: [], total: 0 };
-    }
-    acc[hospitalName].duties.push(duty);
-    acc[hospitalName].total += duty.platform_fee || 0;
-    return acc;
-  }, {});
+  const unpaidInvoices = invoices.filter(i => i.status !== "paid");
+  const overdueInvoices = unpaidInvoices.filter(i => new Date(i.due_date) < new Date());
 
   return (
     <div className="admin-container">
@@ -147,7 +287,7 @@ function AdminPanel() {
         <div className="stat-card" style={{ borderTop: "3px solid #6a0dad" }}><h3 style={{ color: "#6a0dad" }}>{nurses.filter(n => n.status === "active").length}</h3><p>Active Nurses</p></div>
         <div className="stat-card green"><h3>{hospitals.filter(h => h.status === "active").length}</h3><p>Active Hospitals</p></div>
         <div className="stat-card orange"><h3>{pendingHospitals.length}</h3><p>Pending Hospitals</p></div>
-        <div className="stat-card red"><h3>{flaggedDoctors.length + flaggedNurses.length}</h3><p>Flagged</p></div>
+        <div className="stat-card red"><h3>{overdueInvoices.length}</h3><p>Overdue Invoices</p></div>
       </div>
 
       <div className="tabs">
@@ -160,7 +300,7 @@ function AdminPanel() {
           Flagged {(flaggedDoctors.length + flaggedNurses.length) > 0 && <span className="badge" style={{ background: "#e74c3c" }}>{flaggedDoctors.length + flaggedNurses.length}</span>}
         </button>
         <button className={activeTab === "billing" ? "active" : ""} onClick={() => { setActiveTab("billing"); fetchBilling(); }}>
-          💰 Billing
+          💰 Billing {overdueInvoices.length > 0 && <span className="badge" style={{ background: "#e74c3c" }}>{overdueInvoices.length}</span>}
         </button>
       </div>
 
@@ -321,100 +461,138 @@ function AdminPanel() {
 
           {activeTab === "billing" && (
             <div className="billing-section">
+
+              {/* Billing Stats */}
               <div className="billing-stats">
                 <div className="billing-stat unpaid">
-                  <h3>₹{totalOwed.toLocaleString()}</h3>
+                  <h3>₹{unpaidInvoices.reduce((sum, i) => sum + (i.total_due || 0), 0).toLocaleString()}</h3>
                   <p>Total Outstanding</p>
                 </div>
                 <div className="billing-stat paid">
-                  <h3>₹{totalPaid.toLocaleString()}</h3>
+                  <h3>₹{invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + (i.total_platform_fee || 0), 0).toLocaleString()}</h3>
                   <p>Total Collected</p>
                 </div>
                 <div className="billing-stat total">
-                  <h3>{billing.filter(d => d.payment_status !== "paid").length}</h3>
-                  <p>Unpaid Duties</p>
+                  <h3>{unpaidInvoices.length}</h3>
+                  <p>Unpaid Invoices</p>
                 </div>
+                <div className="billing-stat" style={{ borderTop: "3px solid #e74c3c" }}>
+                  <h3 style={{ color: "#e74c3c" }}>{overdueInvoices.length}</h3>
+                  <p>Overdue</p>
+                </div>
+              </div>
+
+              {/* Generate Invoice Button */}
+              <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                <button
+                  onClick={generateMonthlyInvoices}
+                  disabled={generatingInvoice || billingLoading}
+                  style={{ padding: "12px 24px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 15, fontWeight: 600 }}
+                >
+                  {generatingInvoice ? "Generating..." : "📋 Generate Monthly Invoices"}
+                </button>
+                <p style={{ color: "#888", fontSize: 13 }}>
+                  Generates invoices for all hospitals with completed unpaid duties. Hospitals are notified automatically. Payment due by 15th of next month.
+                </p>
               </div>
 
               {billingLoading ? <p className="loading">Loading billing data...</p> : (
                 <>
-                  <h3 style={{ color: "#1e3a5f", marginBottom: 16 }}>Outstanding Dues by Hospital</h3>
-                  {Object.keys(billingByHospital).length === 0 ? (
-                    <p className="empty">No outstanding dues!</p>
-                  ) : (
-                    Object.entries(billingByHospital).map(([hospitalName, data]) => (
-                      <div key={hospitalName} className="hospital-billing-card">
-                        <div className="hospital-billing-header">
-                          <div>
-                            <h4>{hospitalName}</h4>
-                            <p>📞 {data.hospital?.phone} | ✉️ {data.hospital?.email}</p>
+                  {/* Unpaid Invoices */}
+                  {unpaidInvoices.length > 0 && (
+                    <>
+                      <h3 style={{ color: "#1e3a5f", marginBottom: 16 }}>📋 Outstanding Invoices</h3>
+                      {unpaidInvoices.map(invoice => {
+                        const isOverdue = new Date(invoice.due_date) < new Date();
+                        return (
+                          <div key={invoice.id} className="hospital-billing-card" style={{ borderLeft: isOverdue ? "4px solid #e74c3c" : "4px solid #f39c12" }}>
+                            <div className="hospital-billing-header">
+                              <div>
+                                <h4>{invoice.hospitals?.hospital_name}</h4>
+                                <p>📞 {invoice.hospitals?.phone} | ✉️ {invoice.hospitals?.email}</p>
+                                <p style={{ fontSize: 13, color: "#888" }}>
+                                  {getMonthLabel(invoice.billing_month)} &nbsp;|&nbsp;
+                                  Due: {invoice.due_date} &nbsp;
+                                  {isOverdue && <span style={{ color: "#e74c3c", fontWeight: 600 }}>⚠️ OVERDUE</span>}
+                                </p>
+                              </div>
+                              <div className="hospital-billing-total">
+                                <span>Platform Fee</span>
+                                <strong>₹{(invoice.total_platform_fee || 0).toLocaleString()}</strong>
+                                {invoice.fine_amount > 0 && (
+                                  <p style={{ color: "#e74c3c", fontSize: 13, margin: "4px 0" }}>+ ₹{invoice.fine_amount} fine</p>
+                                )}
+                                <strong style={{ fontSize: 20 }}>Total: ₹{(invoice.total_due || 0).toLocaleString()}</strong>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                              <button
+                                onClick={() => markInvoicePaid(invoice.id, invoice.hospital_id)}
+                                style={{ padding: "8px 16px", background: "#e8f5e9", color: "#2e7d32", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                              >
+                                ✅ Mark as Paid
+                              </button>
+                              {isOverdue && (
+                                <button
+                                  onClick={() => addWeeklyFine(invoice.id, invoice.fine_amount || 0, invoice.total_due, invoice.total_platform_fee)}
+                                  style={{ padding: "8px 16px", background: "#fff3e0", color: "#e65100", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                                >
+                                  ➕ Add ₹500 Fine
+                                </button>
+                              )}
+                              {isOverdue && (
+                                <button
+                                  onClick={() => freezeForNonPayment(invoice.hospital_id, invoice.id)}
+                                  style={{ padding: "8px 16px", background: "#fce4ec", color: "#c62828", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                                >
+                                  🔴 Freeze Account
+                                </button>
+                              )}
+                            </div>
+                            <div style={{ marginTop: 12 }}>
+                              <p style={{ fontSize: 13, color: "#888" }}>{invoice.total_duties} duties | Gross: ₹{(invoice.total_gross || 0).toLocaleString()}</p>
+                            </div>
                           </div>
-                          <div className="hospital-billing-total">
-                            <span>Total Owed</span>
-                            <strong>₹{data.total.toLocaleString()}</strong>
-                          </div>
-                        </div>
-                        <table className="billing-table">
-                          <thead>
-                            <tr>
-                              <th>Date</th><th>Type</th><th>Doctor/Nurse</th>
-                              <th>Gross Pay</th><th>Doctor Pay (80%)</th>
-                              <th>Our Fee (20%)</th><th>Status</th><th>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {data.duties.map(duty => (
-                              <tr key={duty.id}>
-                                <td>{duty.date}</td>
-                                <td><span style={{ background: duty.duty_type === "nurse" ? "#f3e5f5" : "#e3f2fd", color: duty.duty_type === "nurse" ? "#6a0dad" : "#1565c0", padding: "2px 8px", borderRadius: 20, fontSize: 12 }}>{duty.duty_type === "nurse" ? "Nurse" : "Doctor"}</span></td>
-                                <td>{duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—"}</td>
-                                <td>₹{(duty.gross_pay || duty.pay || 0).toLocaleString()}</td>
-                                <td>₹{(duty.doctor_pay || 0).toLocaleString()}</td>
-                                <td>₹{(duty.platform_fee || 0).toLocaleString()}</td>
-                                <td>
-                                  <span className={`payment-pill ${duty.payment_status === "paid" ? "paid" : "unpaid"}`}>
-                                    {duty.payment_status === "paid" ? "✅ Paid" : "⏳ Unpaid"}
-                                  </span>
-                                </td>
-                                <td>
-                                  {duty.payment_status !== "paid" && (
-                                    <button className="mark-paid-btn" onClick={() => markAsPaid(duty.id)}>Mark Paid</button>
-                                  )}
-                                  {duty.payment_status === "paid" && (
-                                    <span style={{ fontSize: 12, color: "#888" }}>
-                                      {duty.payment_cleared_at ? new Date(duty.payment_cleared_at).toLocaleDateString() : "Cleared"}
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ))
+                        );
+                      })}
+                    </>
                   )}
 
-                  {billing.filter(d => d.payment_status === "paid").length > 0 && (
+                  {/* Paid Invoices */}
+                  {invoices.filter(i => i.status === "paid").length > 0 && (
                     <>
-                      <h3 style={{ color: "#27ae60", marginBottom: 16, marginTop: 32 }}>✅ Cleared Dues</h3>
+                      <h3 style={{ color: "#27ae60", marginBottom: 16, marginTop: 32 }}>✅ Paid Invoices</h3>
                       <table className="admin-table">
                         <thead>
-                          <tr><th>Date</th><th>Hospital</th><th>Doctor/Nurse</th><th>Gross Pay</th><th>Our Fee</th><th>Cleared On</th></tr>
+                          <tr>
+                            <th>Hospital</th>
+                            <th>Month</th>
+                            <th>Duties</th>
+                            <th>Platform Fee</th>
+                            <th>Fine</th>
+                            <th>Total Paid</th>
+                            <th>Paid On</th>
+                          </tr>
                         </thead>
                         <tbody>
-                          {billing.filter(d => d.payment_status === "paid").map(duty => (
-                            <tr key={duty.id}>
-                              <td>{duty.date}</td>
-                              <td>{duty.hospitals?.hospital_name}</td>
-                              <td>{duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—"}</td>
-                              <td>₹{(duty.gross_pay || duty.pay || 0).toLocaleString()}</td>
-                              <td>₹{(duty.platform_fee || 0).toLocaleString()}</td>
-                              <td>{duty.payment_cleared_at ? new Date(duty.payment_cleared_at).toLocaleDateString() : "—"}</td>
+                          {invoices.filter(i => i.status === "paid").map(invoice => (
+                            <tr key={invoice.id}>
+                              <td>{invoice.hospitals?.hospital_name}</td>
+                              <td>{getMonthLabel(invoice.billing_month)}</td>
+                              <td>{invoice.total_duties}</td>
+                              <td>₹{(invoice.total_platform_fee || 0).toLocaleString()}</td>
+                              <td>{invoice.fine_amount > 0 ? `₹${invoice.fine_amount}` : "—"}</td>
+                              <td>₹{(invoice.total_due || 0).toLocaleString()}</td>
+                              <td>{invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString() : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </>
+                  )}
+
+                  {invoices.length === 0 && (
+                    <p className="empty">No invoices generated yet. Click "Generate Monthly Invoices" to create invoices for this month.</p>
                   )}
                 </>
               )}
