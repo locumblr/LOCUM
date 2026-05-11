@@ -36,26 +36,33 @@ function Login() {
           .select("status")
           .eq("id", data.user.id)
           .single();
-
-        if (doctor?.status === "pending") {
-          await supabase.auth.signOut();
-          setError("Your account is still under review. You will be notified once approved.");
-          setLoading(false);
-          return;
-        }
         if (doctor?.status === "frozen") {
           await supabase.auth.signOut();
           setError("Your account has been suspended. Please contact support.");
           setLoading(false);
           return;
         }
-        if (doctor?.status === "rejected") {
+        navigate("/doctor/dashboard");
+
+      } else if (role === "nurse") {
+        const { data: nurse } = await supabase
+          .from("nurses")
+          .select("status")
+          .eq("id", data.user.id)
+          .single();
+        if (!nurse) {
           await supabase.auth.signOut();
-          setError("Your account application was rejected. Please contact support.");
+          setError("Nurse account not found. Please register again.");
           setLoading(false);
           return;
         }
-        navigate("/doctor/dashboard");
+        if (nurse.status === "frozen") {
+          await supabase.auth.signOut();
+          setError("Your account has been suspended. Please contact support.");
+          setLoading(false);
+          return;
+        }
+        navigate("/nurse/dashboard");
 
       } else if (role === "hospital") {
         const { data: hospital } = await supabase
@@ -63,7 +70,6 @@ function Login() {
           .select("status")
           .eq("id", data.user.id)
           .single();
-
         if (hospital?.status === "pending") {
           await supabase.auth.signOut();
           setError("Your account is still under review. You will be notified once approved.");
@@ -85,6 +91,7 @@ function Login() {
         navigate("/hospital/dashboard");
 
       } else {
+        await supabase.auth.signOut();
         setError("Unknown account type. Please contact support.");
       }
 

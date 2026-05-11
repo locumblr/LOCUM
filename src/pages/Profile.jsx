@@ -13,7 +13,7 @@ function Profile() {
 
   const [personal, setPersonal] = useState({
     firstName: "", lastName: "", email: "",
-    phone: "", idNumber: "", hospitalName: "",
+    phone: "", hospitalName: "",
     address: "", registrationNumber: "", contactPerson: "",
   });
 
@@ -34,20 +34,18 @@ function Profile() {
     if (!user) { navigate("/login"); return; }
     const userRole = user.user_metadata?.role;
     setRole(userRole);
+
     if (userRole === "doctor") {
       const { data } = await supabase.from("doctors").select("*").eq("id", user.id).single();
       if (data) {
-        setPersonal({
-          firstName: data.first_name || "",
-          lastName: data.last_name || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          idNumber: data.id_number || "",
-        });
-        setQualification({
-          degree: data.qualification || "",
-          experience: data.experience || "",
-        });
+        setPersonal({ firstName: data.first_name || "", lastName: data.last_name || "", email: data.email || "", phone: data.phone || "" });
+        setQualification({ degree: data.qualification || "", experience: data.experience || "" });
+      }
+    } else if (userRole === "nurse") {
+      const { data } = await supabase.from("nurses").select("*").eq("id", user.id).single();
+      if (data) {
+        setPersonal({ firstName: data.first_name || "", lastName: data.last_name || "", email: data.email || "", phone: data.phone || "" });
+        setQualification({ degree: data.qualification || "", experience: data.experience || "" });
       }
     } else if (userRole === "hospital") {
       const { data } = await supabase.from("hospitals").select("*").eq("id", user.id).single();
@@ -69,7 +67,7 @@ function Profile() {
     setHistoryLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    if (role === "doctor") {
+    if (role === "doctor" || role === "nurse") {
       const { data } = await supabase
         .from("locum_duties")
         .select("*, hospitals(hospital_name, address)")
@@ -79,7 +77,7 @@ function Profile() {
     } else if (role === "hospital") {
       const { data } = await supabase
         .from("locum_duties")
-        .select("*, doctors(first_name, last_name)")
+        .select("*, doctors(first_name, last_name), nurses(first_name, last_name)")
         .eq("hospital_id", user.id)
         .order("date", { ascending: false });
       setDutyHistory(data || []);
@@ -90,8 +88,9 @@ function Profile() {
   const savePersonal = async (e) => {
     e.preventDefault();
     const { data: { user } } = await supabase.auth.getUser();
-    if (role === "doctor") {
-      const { error } = await supabase.from("doctors").update({
+    if (role === "doctor" || role === "nurse") {
+      const table = role === "nurse" ? "nurses" : "doctors";
+      const { error } = await supabase.from(table).update({
         first_name: personal.firstName,
         last_name: personal.lastName,
         phone: personal.phone,
@@ -112,7 +111,8 @@ function Profile() {
   const saveQualification = async (e) => {
     e.preventDefault();
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("doctors").update({
+    const table = role === "nurse" ? "nurses" : "doctors";
+    const { error } = await supabase.from(table).update({
       qualification: qualification.degree,
       experience: parseInt(qualification.experience),
     }).eq("id", user.id);
@@ -145,6 +145,13 @@ function Profile() {
     return <span className="history-badge open">Open</span>;
   };
 
+  const getStaffName = (duty) => {
+    if (duty.duty_type === "nurse") {
+      return duty.nurses ? `${duty.nurses.first_name} ${duty.nurses.last_name}` : "—";
+    }
+    return duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—";
+  };
+
   const completedDuties = dutyHistory.filter(d => d.completed);
   const upcomingDuties = dutyHistory.filter(d => !d.completed && d.booking_status === "confirmed");
   const pendingDuties = dutyHistory.filter(d => !d.completed && d.booking_status !== "confirmed");
@@ -163,15 +170,16 @@ function Profile() {
 
       <div className="profile-card">
         <div className="photo-circle">
-          <span>👤</span>
+          <span>{role === "nurse" ? "👩‍⚕️" : role === "doctor" ? "👨‍⚕️" : "🏥"}</span>
         </div>
         <div className="profile-name">
           <h2>
-            {role === "doctor"
-              ? `Dr. ${personal.firstName} ${personal.lastName}`
-              : personal.hospitalName}
+            {role === "doctor" ? `Dr. ${personal.firstName} ${personal.lastName}` :
+             role === "nurse" ? `${personal.firstName} ${personal.lastName}` :
+             personal.hospitalName}
           </h2>
-          <p>{role === "doctor" ? qualification.degree : personal.email}</p>
+          <p>{role === "doctor" || role === "nurse" ? qualification.degree : personal.email}</p>
+          {role === "nurse" && <span style={{ background: "#f3e5f5", color: "#6a0dad", padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>Nurse</span>}
         </div>
       </div>
 
@@ -179,7 +187,7 @@ function Profile() {
         <button className={activeTab === "personal" ? "active" : ""} onClick={() => setActiveTab("personal")}>
           Personal Details
         </button>
-        {role === "doctor" && (
+        {(role === "doctor" || role === "nurse") && (
           <button className={activeTab === "qualification" ? "active" : ""} onClick={() => setActiveTab("qualification")}>
             Qualification
           </button>
@@ -188,13 +196,13 @@ function Profile() {
           Change Password
         </button>
         <button className={activeTab === "history" ? "active" : ""} onClick={() => { setActiveTab("history"); fetchHistory(); }}>
-          {role === "doctor" ? "Duty History" : "Duty History"}
+          Duty History
         </button>
       </div>
 
       {activeTab === "personal" && (
         <form onSubmit={savePersonal} className="profile-form">
-          {role === "doctor" ? (
+          {role === "doctor" || role === "nurse" ? (
             <>
               <div className="form-row">
                 <div className="form-group">
@@ -243,7 +251,7 @@ function Profile() {
         </form>
       )}
 
-      {activeTab === "qualification" && role === "doctor" && (
+      {activeTab === "qualification" && (role === "doctor" || role === "nurse") && (
         <form onSubmit={saveQualification} className="profile-form">
           <div className="form-group">
             <label>Qualification</label>
@@ -292,7 +300,7 @@ function Profile() {
                   <h3>{pendingDuties.length}</h3>
                   <p>Pending</p>
                 </div>
-                {role === "doctor" && (
+                {(role === "doctor" || role === "nurse") && (
                   <div className="history-stat green">
                     <h3>₹{completedDuties.reduce((sum, d) => sum + (d.doctor_pay || Math.round((d.pay || 0) * 0.8)), 0).toLocaleString()}</h3>
                     <p>Total Earned</p>
@@ -314,16 +322,16 @@ function Profile() {
                       <div className="history-card-header">
                         <div>
                           <p className="history-card-title">
-                            {role === "doctor"
+                            {role === "doctor" || role === "nurse"
                               ? duty.hospitals?.hospital_name
-                              : duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "Unbooked"}
+                              : getStaffName(duty)}
                           </p>
                           <p className="history-card-sub">
-                            {role === "doctor" ? duty.hospitals?.address : duty.qualification}
+                            {role === "doctor" || role === "nurse" ? duty.hospitals?.address : duty.qualification}
                           </p>
                         </div>
                         <div style={{ textAlign: "right" }}>
-                          <p className="history-card-pay">₹{(role === "doctor" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
+                          <p className="history-card-pay">₹{(role === "doctor" || role === "nurse" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
                           {getDutyStatusBadge(duty)}
                         </div>
                       </div>
@@ -341,16 +349,16 @@ function Profile() {
                       <div className="history-card-header">
                         <div>
                           <p className="history-card-title">
-                            {role === "doctor"
+                            {role === "doctor" || role === "nurse"
                               ? duty.hospitals?.hospital_name
-                              : duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "Unbooked"}
+                              : getStaffName(duty)}
                           </p>
                           <p className="history-card-sub">
-                            {role === "doctor" ? duty.hospitals?.address : duty.qualification}
+                            {role === "doctor" || role === "nurse" ? duty.hospitals?.address : duty.qualification}
                           </p>
                         </div>
                         <div style={{ textAlign: "right" }}>
-                          <p className="history-card-pay">₹{(role === "doctor" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
+                          <p className="history-card-pay">₹{(role === "doctor" || role === "nurse" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
                           {getDutyStatusBadge(duty)}
                         </div>
                       </div>
@@ -368,16 +376,16 @@ function Profile() {
                       <div className="history-card-header">
                         <div>
                           <p className="history-card-title">
-                            {role === "doctor"
+                            {role === "doctor" || role === "nurse"
                               ? duty.hospitals?.hospital_name
-                              : duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—"}
+                              : getStaffName(duty)}
                           </p>
                           <p className="history-card-sub">
-                            {role === "doctor" ? duty.hospitals?.address : duty.qualification}
+                            {role === "doctor" || role === "nurse" ? duty.hospitals?.address : duty.qualification}
                           </p>
                         </div>
                         <div style={{ textAlign: "right" }}>
-                          <p className="history-card-pay">₹{(role === "doctor" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
+                          <p className="history-card-pay">₹{(role === "doctor" || role === "nurse" ? (duty.doctor_pay || Math.round(duty.pay * 0.8)) : (duty.gross_pay || duty.pay)).toLocaleString()}</p>
                           {getDutyStatusBadge(duty)}
                         </div>
                       </div>
