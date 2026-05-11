@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import "./HospitalDashboard.css";
 
 const allQualifications = [
@@ -93,6 +95,7 @@ function HospitalDashboard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [hospitalName, setHospitalName] = useState("");
+  const [hospitalId, setHospitalId] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -100,67 +103,77 @@ function HospitalDashboard() {
   const [pendingInvoice, setPendingInvoice] = useState(null);
   const [showPaymentReminder, setShowPaymentReminder] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
+  const [paidInvoices, setPaidInvoices] = useState([]);
 
   useEffect(() => {
     fetchHospitalData();
-    fetchDuties();
-    fetchNotifications();
-    fetchPendingInvoice();
   }, []);
 
   const fetchHospitalData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
+    setHospitalId(user.id);
     const { data } = await supabase.from("hospitals").select("hospital_name").eq("id", user.id).single();
     if (data) setHospitalName(data.hospital_name);
+    fetchDuties(user.id);
+    fetchNotifications(user.id);
+    fetchPendingInvoice(user.id);
+    fetchPaidInvoices(user.id);
   };
 
-  const fetchDuties = async () => {
+  const fetchDuties = async (uid) => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
     const { data, error } = await supabase
       .from("locum_duties")
       .select("*")
-      .eq("hospital_id", user.id)
+      .eq("hospital_id", uid)
       .eq("completed", false)
       .order("created_at", { ascending: false });
     if (!error) setDuties(data || []);
     setLoading(false);
   };
 
-  const fetchNotifications = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  const fetchNotifications = async (uid) => {
     const { data } = await supabase
       .from("notifications")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", uid)
       .order("created_at", { ascending: false });
     setNotifications(data || []);
     setUnreadCount((data || []).filter(n => !n.read).length);
   };
 
-  const fetchPendingInvoice = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  const fetchPendingInvoice = async (uid) => {
     const { data } = await supabase
       .from("monthly_invoices")
       .select("*")
-      .eq("hospital_id", user.id)
+      .eq("hospital_id", uid)
       .neq("status", "paid")
-      .eq("admin_verified", false)
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
     if (data) {
       setPendingInvoice(data);
-      // Show reminder if due date is within 2 days or past
       const dueDate = new Date(data.due_date);
       const today = new Date();
       const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
       if (daysUntilDue <= 2) setShowPaymentReminder(true);
     }
+  };
+
+  const fetchPaidInvoices = async (uid) => {
+    const { data } = await supabase
+      .from("monthly_invoices")
+      .select("*")
+      .eq("hospital_id", uid)
+      .eq("status", "paid")
+      .order("paid_at", { ascending: false });
+    setPaidInvoices(data || []);
+  };
+
+  const markAllRead = async () => {
+    await supabase.from("notifications").update({ read: true }).eq("user_id", hospitalId);
+    fetchNotifications(hospitalId);
   };
 
   const markAsPaid = async () => {
@@ -172,7 +185,6 @@ function HospitalDashboard() {
       status: "payment_requested",
     }).eq("id", pendingInvoice.id);
 
-    // Notify admin
     const { data: admins } = await supabase.from("admins").select("id");
     for (const admin of admins || []) {
       await supabase.from("notifications").insert({
@@ -183,15 +195,117 @@ function HospitalDashboard() {
     }
 
     alert("Payment marked! Admin has been notified and will verify shortly.");
-    fetchPendingInvoice();
+    fetchPendingInvoice(hospitalId);
     setShowPaymentReminder(false);
     setMarkingPaid(false);
   };
 
-  const markAllRead = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id);
-    fetchNotifications();
+  const generateInvoicePDF = (invoice) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(30, 58, 95);
+    doc.rect(0, 0, pageWidth, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("LOCUM", 20, 22);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Healthcare Technologies, Bangalore, India", 20, 32);
+    doc.text("locum.blr@gmail.com", pageWidth - 20, 32, { align: "right" });
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("INVOICE", pageWidth - 20, 55, { align: "right" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    const invoiceNumber = `INV-${invoice.billing_month}-${invoice.hospital_id?.slice(0, 6).toUpperCase()}`;
+    doc.text(`Invoice No: ${invoiceNumber}`, pageWidth - 20, 63, { align: "right" });
+    doc.text(`Date: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - 20, 70, { align: "right" });
+    doc.text(`Due Date: ${invoice.due_date}`, pageWidth - 20, 77, { align: "right" });
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill To:", 20, 55);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(10);
+    doc.text(hospitalName, 20, 63);
+
+    doc.setDrawColor(30, 58, 95);
+    doc.setLineWidth(0.5);
+    doc.line(20, 85, pageWidth - 20, 85);
+
+    const [year, month] = invoice.billing_month.split("-");
+    const monthLabel = new Date(year, month - 1).toLocaleString("default", { month: "long", year: "numeric" });
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Billing Period: ${monthLabel}`, 20, 95);
+
+    autoTable(doc, {
+      startY: 102,
+      head: [["Description", "Details", "Amount"]],
+      body: [
+        [
+          "Locum Platform Fee",
+          `${invoice.total_duties} completed duties\nGross duty value: ₹${(invoice.total_gross || 0).toLocaleString("en-IN")}`,
+          `₹${(invoice.total_platform_fee || 0).toLocaleString("en-IN")}`,
+        ],
+        ...(invoice.fine_amount > 0 ? [[
+          "Late Payment Fine",
+          `${invoice.weeks_overdue || 0} week(s) overdue`,
+          `₹${invoice.fine_amount.toLocaleString("en-IN")}`,
+        ]] : []),
+      ],
+      foot: [["", "Total Due", `₹${(invoice.total_due || 0).toLocaleString("en-IN")}`]],
+      headStyles: { fillColor: [30, 58, 95], textColor: 255, fontSize: 10, fontStyle: "bold" },
+      footStyles: { fillColor: [240, 244, 248], textColor: [30, 58, 95], fontSize: 11, fontStyle: "bold" },
+      bodyStyles: { fontSize: 10, textColor: [50, 50, 50] },
+      columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 90 }, 2: { cellWidth: 30, halign: "right" } },
+      margin: { left: 20, right: 20 },
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 16;
+    doc.setFillColor(240, 244, 248);
+    doc.rect(20, finalY, pageWidth - 40, 30, "F");
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Payment Terms", 28, finalY + 10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Payment due by ${invoice.due_date}. Late payments attract a fine of ₹500 per week.`, 28, finalY + 18);
+    doc.text("Accounts frozen for non-payment beyond 14 days.", 28, finalY + 25);
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Payment Details", 20, finalY + 46);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 54);
+
+    if (invoice.status === "paid") {
+      doc.setTextColor(46, 125, 50);
+      doc.setFontSize(28);
+      doc.setFont("helvetica", "bold");
+      doc.text("PAID", pageWidth - 20, finalY + 54, { align: "right" });
+    }
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, doc.internal.pageSize.getHeight() - 20, pageWidth - 20, doc.internal.pageSize.getHeight() - 20);
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.setFont("helvetica", "normal");
+    doc.text("LOCUM Healthcare Technologies | Bangalore, India | locum.blr@gmail.com", pageWidth / 2, doc.internal.pageSize.getHeight() - 12, { align: "center" });
+
+    doc.save(`LOCUM-Invoice-${invoiceNumber}.pdf`);
   };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -207,17 +321,13 @@ function HospitalDashboard() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (form.qualifications.length === 0) {
-      alert("Please select at least one qualification.");
-      return;
-    }
+    if (form.qualifications.length === 0) { alert("Please select at least one qualification."); return; }
     setSubmitting(true);
-    const { data: { user } } = await supabase.auth.getUser();
     const grossPay = parseFloat(form.pay);
     const doctorPay = Math.round(grossPay * 0.8);
     const platformFee = Math.round(grossPay * 0.2);
     const { error } = await supabase.from("locum_duties").insert({
-      hospital_id: user.id,
+      hospital_id: hospitalId,
       date: form.date,
       start_time: form.start_time,
       end_time: form.end_time,
@@ -243,7 +353,7 @@ function HospitalDashboard() {
             qualification: q,
             title: "New Locum Duty Available!",
             body: `A new duty is available on ${form.date}. ₹${doctorPay.toLocaleString()}`,
-            url: "/doctor/dashboard",
+            url: showForm === "nurse" ? "/nurse/dashboard" : "/doctor/dashboard",
           },
         });
       }
@@ -251,7 +361,7 @@ function HospitalDashboard() {
       setForm(emptyForm);
       setShowForm(null);
       setShowQualDropdown(false);
-      fetchDuties();
+      fetchDuties(hospitalId);
     }
     setSubmitting(false);
   };
@@ -278,7 +388,6 @@ function HospitalDashboard() {
   return (
     <div className="dashboard-container">
 
-      {/* Payment Reminder Floating Banner */}
       {showPaymentReminder && pendingInvoice && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
@@ -298,11 +407,7 @@ function HospitalDashboard() {
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               {!pendingInvoice.payment_requested ? (
-                <button
-                  onClick={markAsPaid}
-                  disabled={markingPaid}
-                  style={{ padding: "10px 20px", background: "white", color: "#1e3a5f", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
-                >
+                <button onClick={markAsPaid} disabled={markingPaid} style={{ padding: "10px 20px", background: "white", color: "#1e3a5f", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
                   {markingPaid ? "Processing..." : "✅ Mark as PAID"}
                 </button>
               ) : (
@@ -349,8 +454,7 @@ function HospitalDashboard() {
         </div>
       )}
 
-      {/* Pending Invoice Card */}
-      {pendingInvoice && !showPaymentReminder && (
+      {pendingInvoice && (
         <div style={{
           background: pendingInvoice.weeks_overdue > 0 ? "#fce4ec" : "#fff8e1",
           border: `1px solid ${pendingInvoice.weeks_overdue > 0 ? "#e74c3c" : "#ff9800"}`,
@@ -361,9 +465,7 @@ function HospitalDashboard() {
               <h3 style={{ color: pendingInvoice.weeks_overdue > 0 ? "#c62828" : "#e65100", marginBottom: 6 }}>
                 {pendingInvoice.weeks_overdue > 0 ? "🔴 Overdue Invoice" : "📋 Invoice Pending"}
               </h3>
-              <p style={{ color: "#555", fontSize: 14 }}>
-                {getMonthLabel(pendingInvoice.billing_month)} — {pendingInvoice.total_duties} duties
-              </p>
+              <p style={{ color: "#555", fontSize: 14 }}>{getMonthLabel(pendingInvoice.billing_month)} — {pendingInvoice.total_duties} duties</p>
               <p style={{ color: "#555", fontSize: 14 }}>Due by: {pendingInvoice.due_date}</p>
               {pendingInvoice.fine_amount > 0 && (
                 <p style={{ color: "#e74c3c", fontSize: 14, fontWeight: 600 }}>⚠️ Includes ₹{pendingInvoice.fine_amount} late fine</p>
@@ -374,17 +476,50 @@ function HospitalDashboard() {
             </div>
             <div style={{ textAlign: "right" }}>
               <p style={{ fontSize: 28, fontWeight: 700, color: "#1e3a5f" }}>₹{pendingInvoice.total_due?.toLocaleString()}</p>
-              {!pendingInvoice.payment_requested && (
-                <button
-                  onClick={markAsPaid}
-                  disabled={markingPaid}
-                  style={{ padding: "10px 24px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", marginTop: 8 }}
-                >
-                  {markingPaid ? "Processing..." : "✅ Mark as PAID"}
+              <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {!pendingInvoice.payment_requested && (
+                  <button onClick={markAsPaid} disabled={markingPaid} style={{ padding: "10px 24px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
+                    {markingPaid ? "Processing..." : "✅ Mark as PAID"}
+                  </button>
+                )}
+                <button onClick={() => generateInvoicePDF(pendingInvoice)} style={{ padding: "10px 24px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
+                  📄 Download Invoice
                 </button>
-              )}
+              </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {paidInvoices.length > 0 && (
+        <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 24, boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}>
+          <h3 style={{ color: "#1e3a5f", marginBottom: 16 }}>✅ Payment History</h3>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f5f7fa" }}>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#555" }}>Month</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#555" }}>Duties</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#555" }}>Amount Paid</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#555" }}>Paid On</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#555" }}>Invoice</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paidInvoices.map(inv => (
+                <tr key={inv.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "10px 12px", fontSize: 14 }}>{getMonthLabel(inv.billing_month)}</td>
+                  <td style={{ padding: "10px 12px", fontSize: 14 }}>{inv.total_duties}</td>
+                  <td style={{ padding: "10px 12px", fontSize: 14, fontWeight: 600, color: "#2e7d32" }}>₹{(inv.total_due || 0).toLocaleString()}</td>
+                  <td style={{ padding: "10px 12px", fontSize: 14 }}>{inv.paid_at ? new Date(inv.paid_at).toLocaleDateString() : "—"}</td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <button onClick={() => generateInvoicePDF(inv)} style={{ padding: "4px 12px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                      📄 PDF
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -421,12 +556,7 @@ function HospitalDashboard() {
           </div>
 
           <div className="form-group">
-            <label>
-              Required Qualifications{" "}
-              {form.qualifications.length > 0 && (
-                <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>
-              )}
-            </label>
+            <label>Required Qualifications {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>}</label>
             {isRadiology(form.qualifications) && (
               <div style={{ background: "#fff8e1", border: "1px solid #ffcc02", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#795500", marginBottom: 8, lineHeight: 1.5 }}>
                 ⚠️ <strong>PCPNDT Notice:</strong> Radiologists performing USG/Ultrasound procedures must hold a valid <strong>PCPNDT registration</strong>. Please select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
@@ -434,23 +564,16 @@ function HospitalDashboard() {
             )}
             <div className="qual-dropdown-container">
               <div className="qual-dropdown-trigger" onClick={() => setShowQualDropdown(!showQualDropdown)}>
-                {form.qualifications.length === 0
-                  ? "Select qualifications..."
-                  : form.qualifications.length === 1
-                  ? form.qualifications[0]
-                  : `${form.qualifications.length} qualifications selected`}
+                {form.qualifications.length === 0 ? "Select qualifications..." :
+                  form.qualifications.length === 1 ? form.qualifications[0] :
+                  `${form.qualifications.length} qualifications selected`}
                 <span style={{ float: "right" }}>{showQualDropdown ? "▲" : "▼"}</span>
               </div>
               {showQualDropdown && (
                 <div className="qual-dropdown-list">
                   {(showForm === "nurse" ? nursingQualifications : allQualifications).map((q) => (
                     <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}>
-                      <input
-                        type="checkbox"
-                        checked={form.qualifications.includes(q)}
-                        onChange={() => toggleQualification(q)}
-                        style={{ marginRight: 8 }}
-                      />
+                      <input type="checkbox" checked={form.qualifications.includes(q)} onChange={() => toggleQualification(q)} style={{ marginRight: 8 }} />
                       {q}
                     </label>
                   ))}
@@ -461,8 +584,7 @@ function HospitalDashboard() {
               <div className="selected-quals">
                 {form.qualifications.map(q => (
                   <span key={q} className="qual-tag">
-                    {q}
-                    <button type="button" onClick={() => toggleQualification(q)}>×</button>
+                    {q}<button type="button" onClick={() => toggleQualification(q)}>×</button>
                   </span>
                 ))}
               </div>
@@ -500,17 +622,13 @@ function HospitalDashboard() {
       {loading ? (
         <p style={{ color: "#888" }}>Loading...</p>
       ) : duties.length === 0 ? (
-        <p className="empty-msg">No duties posted yet. Click "Post New Locum Duty" to get started.</p>
+        <p className="empty-msg">No duties posted yet.</p>
       ) : (
         <div className="duties-grid">
           {duties.map((duty) => (
             <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "booked" : duty.booking_status === "reopened" ? "reopened-card" : duty.booked ? "booked" : ""}`}>
               <div className="duty-header">
-                <h3>
-                  {duty.qualifications && duty.qualifications.length > 1
-                    ? `${duty.qualifications.length} Qualifications`
-                    : duty.qualification}
-                </h3>
+                <h3>{duty.qualifications && duty.qualifications.length > 1 ? `${duty.qualifications.length} Qualifications` : duty.qualification}</h3>
                 <span className="pay">₹{duty.gross_pay || duty.pay}</span>
               </div>
               <div className="duty-details">

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import "./AdminPanel.css";
 
 function AdminPanel() {
@@ -55,11 +57,6 @@ function AdminPanel() {
     setBillingLoading(false);
   };
 
-  const getCurrentBillingMonth = () => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  };
-
   const getMonthLabel = (monthStr) => {
     if (!monthStr) return "";
     const [year, month] = monthStr.split("-");
@@ -75,11 +72,9 @@ function AdminPanel() {
     const now = new Date();
     const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1);
     const billingMonth = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 15);
     const dueDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-15`;
 
     const unpaidDuties = billing.filter(d => d.payment_status !== "paid" && d.completed);
-
     const byHospital = unpaidDuties.reduce((acc, duty) => {
       const hid = duty.hospital_id;
       if (!hid) return acc;
@@ -96,14 +91,12 @@ function AdminPanel() {
     for (const hid of Object.keys(byHospital)) {
       const h = byHospital[hid];
       if (h.duties.length === 0) continue;
-
       const { data: existing } = await supabase
         .from("monthly_invoices")
         .select("id")
         .eq("hospital_id", hid)
         .eq("billing_month", billingMonth)
         .single();
-
       if (!existing) {
         await supabase.from("monthly_invoices").insert({
           hospital_id: hid,
@@ -119,7 +112,6 @@ function AdminPanel() {
           admin_verified: false,
           weeks_overdue: 0,
         });
-
         await supabase.from("notifications").insert({
           user_id: hid,
           title: `📋 Invoice for ${getMonthLabel(billingMonth)}`,
@@ -128,39 +120,141 @@ function AdminPanel() {
         count++;
       }
     }
-
     alert(`${count} invoice(s) generated and hospitals notified!`);
     fetchBilling();
     setGeneratingInvoice(false);
   };
 
+  const generateInvoicePDF = (invoice) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(30, 58, 95);
+    doc.rect(0, 0, pageWidth, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("LOCUM", 20, 22);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Healthcare Technologies, Bangalore, India", 20, 32);
+    doc.text("locum.blr@gmail.com", pageWidth - 20, 32, { align: "right" });
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("INVOICE", pageWidth - 20, 55, { align: "right" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    const invoiceNumber = `INV-${invoice.billing_month}-${invoice.hospital_id?.slice(0, 6).toUpperCase()}`;
+    doc.text(`Invoice No: ${invoiceNumber}`, pageWidth - 20, 63, { align: "right" });
+    doc.text(`Date: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - 20, 70, { align: "right" });
+    doc.text(`Due Date: ${invoice.due_date}`, pageWidth - 20, 77, { align: "right" });
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill To:", 20, 55);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(10);
+    doc.text(invoice.hospitals?.hospital_name || "Hospital", 20, 63);
+    doc.text(invoice.hospitals?.email || "", 20, 70);
+    doc.text(invoice.hospitals?.phone || "", 20, 77);
+
+    doc.setDrawColor(30, 58, 95);
+    doc.setLineWidth(0.5);
+    doc.line(20, 85, pageWidth - 20, 85);
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Billing Period: ${getMonthLabel(invoice.billing_month)}`, 20, 95);
+
+    autoTable(doc, {
+      startY: 102,
+      head: [["Description", "Details", "Amount"]],
+      body: [
+        [
+          "Locum Platform Fee",
+          `${invoice.total_duties} completed duties\nGross duty value: ₹${(invoice.total_gross || 0).toLocaleString("en-IN")}`,
+          `₹${(invoice.total_platform_fee || 0).toLocaleString("en-IN")}`,
+        ],
+        ...(invoice.fine_amount > 0 ? [[
+          "Late Payment Fine",
+          `${invoice.weeks_overdue || 0} week(s) overdue`,
+          `₹${invoice.fine_amount.toLocaleString("en-IN")}`,
+        ]] : []),
+      ],
+      foot: [["", "Total Due", `₹${(invoice.total_due || 0).toLocaleString("en-IN")}`]],
+      headStyles: { fillColor: [30, 58, 95], textColor: 255, fontSize: 10, fontStyle: "bold" },
+      footStyles: { fillColor: [240, 244, 248], textColor: [30, 58, 95], fontSize: 11, fontStyle: "bold" },
+      bodyStyles: { fontSize: 10, textColor: [50, 50, 50] },
+      columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 90 }, 2: { cellWidth: 30, halign: "right" } },
+      margin: { left: 20, right: 20 },
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 16;
+    doc.setFillColor(240, 244, 248);
+    doc.rect(20, finalY, pageWidth - 40, 30, "F");
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Payment Terms", 28, finalY + 10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Payment due by ${invoice.due_date}. Late payments attract a fine of ₹500 per week.`, 28, finalY + 18);
+    doc.text("Accounts frozen for non-payment beyond 14 days.", 28, finalY + 25);
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Payment Details", 20, finalY + 46);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 54);
+
+    if (invoice.status === "paid") {
+      doc.setTextColor(46, 125, 50);
+      doc.setFontSize(28);
+      doc.setFont("helvetica", "bold");
+      doc.text("PAID", pageWidth - 20, finalY + 54, { align: "right" });
+    }
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, doc.internal.pageSize.getHeight() - 20, pageWidth - 20, doc.internal.pageSize.getHeight() - 20);
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.setFont("helvetica", "normal");
+    doc.text("LOCUM Healthcare Technologies | Bangalore, India | locum.blr@gmail.com", pageWidth / 2, doc.internal.pageSize.getHeight() - 12, { align: "center" });
+
+    doc.save(`LOCUM-Invoice-${invoiceNumber}.pdf`);
+  };
+
   const verifyPayment = async (invoiceId, hospitalId) => {
     const confirmed = window.confirm("Verify this payment and mark invoice as paid?");
     if (!confirmed) return;
-
     await supabase.from("monthly_invoices").update({
       status: "paid",
       admin_verified: true,
       paid_at: new Date().toISOString(),
     }).eq("id", invoiceId);
-
     const hospital = hospitals.find(h => h.id === hospitalId);
     if (hospital?.status === "frozen") {
       await supabase.from("hospitals").update({ status: "active" }).eq("id", hospitalId);
     }
-
     await supabase.from("locum_duties")
       .update({ payment_status: "paid", payment_cleared_at: new Date().toISOString() })
       .eq("hospital_id", hospitalId)
       .eq("completed", true)
       .eq("payment_status", "unpaid");
-
     await supabase.from("notifications").insert({
       user_id: hospitalId,
       title: "✅ Payment Verified — Account Cleared",
       message: "Your payment has been verified by LOCUM admin. Your account is now active and all dues have been cleared. Thank you!",
     });
-
     alert("Payment verified! Hospital account cleared.");
     fetchData();
     fetchBilling();
@@ -171,19 +265,16 @@ function AdminPanel() {
     if (!invoice) return;
     const newFine = (currentFine || 0) + 500;
     const newTotal = invoice.total_platform_fee + newFine;
-
     await supabase.from("monthly_invoices").update({
       fine_amount: newFine,
       total_due: newTotal,
       weeks_overdue: (invoice.weeks_overdue || 0) + 1,
     }).eq("id", invoiceId);
-
     await supabase.from("notifications").insert({
       user_id: hospitalId,
       title: "⚠️ Late Payment Fine Added",
       message: `A late payment fine of ₹500 has been added. New total due: ₹${newTotal.toLocaleString()}. Please clear dues immediately.`,
     });
-
     fetchBilling();
   };
 
@@ -294,7 +385,7 @@ function AdminPanel() {
         <button className={activeTab === "billing" ? "active" : ""} onClick={() => { setActiveTab("billing"); fetchBilling(); }}>
           💰 Billing
           {paymentRequestedInvoices.length > 0 && <span className="badge" style={{ background: "#27ae60" }}>{paymentRequestedInvoices.length}</span>}
-          {overdueInvoices.length > 0 && <span className="badge" style={{ background: "#e74c3c" }}>{overdueInvoices.length}</span>}
+          {overdueInvoices.length > 0 && <span className="badge" style={{ background: "#e74c3c", marginLeft: 4 }}>{overdueInvoices.length}</span>}
         </button>
       </div>
 
@@ -489,7 +580,6 @@ function AdminPanel() {
 
               {billingLoading ? <p className="loading">Loading billing data...</p> : (
                 <>
-                  {/* Payment Verification Needed */}
                   {paymentRequestedInvoices.length > 0 && (
                     <>
                       <h3 style={{ color: "#27ae60", marginBottom: 16 }}>💰 Payments Awaiting Verification</h3>
@@ -508,12 +598,18 @@ function AdminPanel() {
                               {invoice.fine_amount > 0 && <p style={{ color: "#e74c3c", fontSize: 13 }}>incl. ₹{invoice.fine_amount} fine</p>}
                             </div>
                           </div>
-                          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
                             <button
                               onClick={() => verifyPayment(invoice.id, invoice.hospital_id)}
                               style={{ padding: "10px 20px", background: "#27ae60", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}
                             >
                               ✅ Verify Payment
+                            </button>
+                            <button
+                              onClick={() => generateInvoicePDF(invoice)}
+                              style={{ padding: "10px 20px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}
+                            >
+                              📄 Download PDF
                             </button>
                           </div>
                           <p style={{ fontSize: 13, color: "#888", marginTop: 8 }}>{invoice.total_duties} duties | Gross: ₹{(invoice.total_gross || 0).toLocaleString()}</p>
@@ -522,7 +618,6 @@ function AdminPanel() {
                     </>
                   )}
 
-                  {/* Outstanding Invoices */}
                   {unpaidInvoices.filter(i => !i.payment_requested).length > 0 && (
                     <>
                       <h3 style={{ color: "#1e3a5f", marginBottom: 16, marginTop: 24 }}>📋 Outstanding Invoices</h3>
@@ -546,6 +641,12 @@ function AdminPanel() {
                               </div>
                             </div>
                             <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                              <button
+                                onClick={() => generateInvoicePDF(invoice)}
+                                style={{ padding: "8px 16px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                              >
+                                📄 Download PDF
+                              </button>
                               {isOverdue && (
                                 <>
                                   <button
@@ -570,21 +671,12 @@ function AdminPanel() {
                     </>
                   )}
 
-                  {/* Paid Invoices */}
                   {invoices.filter(i => i.status === "paid").length > 0 && (
                     <>
                       <h3 style={{ color: "#27ae60", marginBottom: 16, marginTop: 32 }}>✅ Paid & Verified Invoices</h3>
                       <table className="admin-table">
                         <thead>
-                          <tr>
-                            <th>Hospital</th>
-                            <th>Month</th>
-                            <th>Duties</th>
-                            <th>Platform Fee</th>
-                            <th>Fine</th>
-                            <th>Total Paid</th>
-                            <th>Paid On</th>
-                          </tr>
+                          <tr><th>Hospital</th><th>Month</th><th>Duties</th><th>Platform Fee</th><th>Fine</th><th>Total Paid</th><th>Paid On</th><th>PDF</th></tr>
                         </thead>
                         <tbody>
                           {invoices.filter(i => i.status === "paid").map(invoice => (
@@ -596,6 +688,11 @@ function AdminPanel() {
                               <td>{invoice.fine_amount > 0 ? `₹${invoice.fine_amount}` : "—"}</td>
                               <td>₹{(invoice.total_due || 0).toLocaleString()}</td>
                               <td>{invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString() : "—"}</td>
+                              <td>
+                                <button onClick={() => generateInvoicePDF(invoice)} style={{ padding: "4px 10px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                                  📄 PDF
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
