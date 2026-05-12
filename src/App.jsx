@@ -19,6 +19,10 @@ import Help from "./pages/Help";
 import NurseDashboard from "./pages/NurseDashboard";
 import NurseLocums from "./pages/NurseLocums";
 import Landing from "./pages/Landing";
+import DepartmentLogin from "./pages/DepartmentLogin";
+import DepartmentDashboard from "./pages/DepartmentDashboard";
+import DepartmentProfile from "./pages/DepartmentProfile";
+
 
 function App() {
   return (
@@ -45,6 +49,9 @@ function App() {
 <Route path="/nurse/locums" element={<NurseLocums />} />
 <Route path="/nurse/profile" element={<Profile />} />
 <Route path="/help" element={<Help />} />
+<Route path="/department/login" element={<DepartmentLogin />} />
+<Route path="/department/dashboard" element={<DepartmentDashboard />} />
+<Route path="/department/profile" element={<DepartmentProfile />} />
       </Routes>
     </BrowserRouter>
   );

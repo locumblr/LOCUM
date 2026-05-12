@@ -356,11 +356,17 @@ function AdminPanel() {
     if (table === "hospitals" && status === "active") {
       const hospital = hospitals.find(h => h.id === id);
       if (hospital) {
+        // Auto-create default departments
+        await supabase.rpc("create_default_departments", {
+          hosp_id: hospital.id,
+          hosp_name: hospital.hospital_name,
+        });
+        // Send approval email
         await supabase.functions.invoke("send-email", {
           body: {
             to: hospital.email,
             subject: "Your LOCUM Hospital Account Has Been Approved!",
-            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;"><h1 style="color: #1e3a5f;">LOCUM</h1><h2>Congratulations, ${hospital.hospital_name}!</h2><p>Your hospital account has been verified and approved.</p><a href="https://project-1qlxe.vercel.app/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a></div>`,
+            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;"><h1 style="color: #1e3a5f;">LOCUM</h1><h2>Congratulations, ${hospital.hospital_name}!</h2><p>Your hospital account has been verified and approved.</p><p>Your department accounts have been automatically created. Log in to view your department codes and set fixed pay rates.</p><a href="https://project-1qlxe.vercel.app/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a></div>`,
           },
         });
       }

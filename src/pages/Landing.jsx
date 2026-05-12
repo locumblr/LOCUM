@@ -206,6 +206,7 @@ function Landing() {
               <span style={{ cursor: "pointer" }} onClick={() => navigate("/support")}>Contact Us</span>
               <span style={{ cursor: "pointer" }} onClick={() => navigate("/terms")}>Terms of Service</span>
               <span style={{ cursor: "pointer" }} onClick={() => navigate("/privacy")}>Privacy Policy</span>
+              <span style={{ cursor: "pointer" }} onClick={() => navigate("/department/login")}>Department Login</span>
             </div>
           </div>
         </div>
