@@ -200,10 +200,11 @@ function HospitalDashboard() {
     setMarkingPaid(false);
   };
 
-  const generateInvoicePDF = (invoice) => {
+ const generateInvoicePDF = (invoice) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    // Header
     doc.setFillColor(30, 58, 95);
     doc.rect(0, 0, pageWidth, 40, "F");
     doc.setTextColor(255, 255, 255);
@@ -215,11 +216,13 @@ function HospitalDashboard() {
     doc.text("Healthcare Technologies, Bangalore, India", 20, 32);
     doc.text("locum.blr@gmail.com", pageWidth - 20, 32, { align: "right" });
 
+    // Invoice title
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.text("INVOICE", pageWidth - 20, 55, { align: "right" });
 
+    // Invoice details
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
@@ -228,6 +231,7 @@ function HospitalDashboard() {
     doc.text(`Date: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - 20, 70, { align: "right" });
     doc.text(`Due Date: ${invoice.due_date}`, pageWidth - 20, 77, { align: "right" });
 
+    // Bill To
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -237,10 +241,12 @@ function HospitalDashboard() {
     doc.setFontSize(10);
     doc.text(hospitalName, 20, 63);
 
+    // Divider
     doc.setDrawColor(30, 58, 95);
     doc.setLineWidth(0.5);
     doc.line(20, 85, pageWidth - 20, 85);
 
+    // Billing period
     const [year, month] = invoice.billing_month.split("-");
     const monthLabel = new Date(year, month - 1).toLocaleString("default", { month: "long", year: "numeric" });
     doc.setTextColor(30, 58, 95);
@@ -248,30 +254,34 @@ function HospitalDashboard() {
     doc.setFont("helvetica", "bold");
     doc.text(`Billing Period: ${monthLabel}`, 20, 95);
 
+    // Table
     autoTable(doc, {
       startY: 102,
       head: [["Description", "Details", "Amount"]],
       body: [
         [
           "Locum Platform Fee",
-          `${invoice.total_duties} completed duties\nGross duty value: ₹${(invoice.total_gross || 0).toLocaleString("en-IN")}`,
-          `₹${(invoice.total_platform_fee || 0).toLocaleString("en-IN")}`,
+          `${invoice.total_duties} completed duties\nGross duty value: Rs.${(invoice.total_gross || 0).toLocaleString("en-IN")}`,
+          `Rs.${(invoice.total_platform_fee || 0).toLocaleString("en-IN")}`,
         ],
         ...(invoice.fine_amount > 0 ? [[
           "Late Payment Fine",
           `${invoice.weeks_overdue || 0} week(s) overdue`,
-          `₹${invoice.fine_amount.toLocaleString("en-IN")}`,
+          `Rs.${invoice.fine_amount.toLocaleString("en-IN")}`,
         ]] : []),
       ],
-      foot: [["", "Total Due", `₹${(invoice.total_due || 0).toLocaleString("en-IN")}`]],
+      foot: [["", "Total Due", `Rs.${(invoice.total_due || 0).toLocaleString("en-IN")}`]],
       headStyles: { fillColor: [30, 58, 95], textColor: 255, fontSize: 10, fontStyle: "bold" },
       footStyles: { fillColor: [240, 244, 248], textColor: [30, 58, 95], fontSize: 11, fontStyle: "bold" },
-      bodyStyles: { fontSize: 10, textColor: [50, 50, 50] },
-      columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 90 }, 2: { cellWidth: 30, halign: "right" } },
+      bodyStyles: { fontSize: 10, textColor: [50, 50, 50], font: "helvetica" },
+      columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 95 }, 2: { cellWidth: 35, halign: "right" } },
       margin: { left: 20, right: 20 },
+      styles: { font: "helvetica", overflow: "linebreak" },
     });
 
     const finalY = doc.lastAutoTable.finalY + 16;
+
+    // Payment terms
     doc.setFillColor(240, 244, 248);
     doc.rect(20, finalY, pageWidth - 40, 30, "F");
     doc.setTextColor(30, 58, 95);
@@ -280,9 +290,10 @@ function HospitalDashboard() {
     doc.text("Payment Terms", 28, finalY + 10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(80, 80, 80);
-    doc.text(`Payment due by ${invoice.due_date}. Late payments attract a fine of ₹500 per week.`, 28, finalY + 18);
+    doc.text(`Payment due by ${invoice.due_date}. Late payments attract a fine of Rs.500 per week.`, 28, finalY + 18);
     doc.text("Accounts frozen for non-payment beyond 14 days.", 28, finalY + 25);
 
+    // Payment details
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -291,6 +302,7 @@ function HospitalDashboard() {
     doc.setTextColor(80, 80, 80);
     doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 54);
 
+    // Paid stamp
     if (invoice.status === "paid") {
       doc.setTextColor(46, 125, 50);
       doc.setFontSize(28);
@@ -298,6 +310,7 @@ function HospitalDashboard() {
       doc.text("PAID", pageWidth - 20, finalY + 54, { align: "right" });
     }
 
+    // Footer
     doc.setDrawColor(200, 200, 200);
     doc.line(20, doc.internal.pageSize.getHeight() - 20, pageWidth - 20, doc.internal.pageSize.getHeight() - 20);
     doc.setFontSize(9);
@@ -307,7 +320,7 @@ function HospitalDashboard() {
 
     doc.save(`LOCUM-Invoice-${invoiceNumber}.pdf`);
   };
-
+  
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const toggleQualification = (q) => {
