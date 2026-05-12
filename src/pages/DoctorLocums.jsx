@@ -7,6 +7,7 @@ function DoctorLocums() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("active");
   const [requestingCover, setRequestingCover] = useState(null);
   const [coverReason, setCoverReason] = useState("");
 
@@ -21,7 +22,7 @@ function DoctorLocums() {
       .from("locum_duties")
       .select("*, hospitals(hospital_name, address, phone, email), cover_requests(id, status, covering_doctor_id)")
       .eq("booked_by", user.id)
-      .order("date", { ascending: true });
+      .order("date", { ascending: false });
     if (!error) setDuties(data || []);
     setLoading(false);
   };
@@ -42,7 +43,7 @@ function DoctorLocums() {
       status: "open",
     });
     if (error) { alert("Error: " + error.message); return; }
-    alert("Cover request submitted! Other eligible doctors will be notified.");
+    alert("Cover request submitted!");
     setRequestingCover(null);
     setCoverReason("");
     fetchBookedDuties();
@@ -63,6 +64,21 @@ function DoctorLocums() {
     return <div className="status-badge pending">⏳ Pending Verification</div>;
   };
 
+  const getReviewBadge = (duty) => {
+    const labels = {
+      satisfactory: { text: "✅ Satisfactory", style: "review-satisfactory" },
+      unsatisfactory: { text: "⚠️ Unsatisfactory", style: "review-unsatisfactory" },
+      late: { text: "🕐 Late to Duty", style: "review-late" },
+      absent: { text: "❌ Absent", style: "review-absent" },
+    };
+    const review = labels[duty.review_status];
+    if (!review) return <div className="status-badge review-satisfactory">✅ Completed</div>;
+    return <div className={`status-badge ${review.style}`}>{review.text}</div>;
+  };
+
+  const activeDuties = duties.filter(d => !d.completed);
+  const completedDuties = duties.filter(d => d.completed);
+
   return (
     <div className="locums-container">
       <div className="locums-header">
@@ -74,20 +90,89 @@ function DoctorLocums() {
         </div>
       </div>
 
+      <div className="duty-type-tabs">
+        <button
+          className={activeTab === "active" ? "active" : ""}
+          onClick={() => setActiveTab("active")}
+        >
+          📋 Active Duties
+          {activeDuties.length > 0 && <span className="tab-count">{activeDuties.length}</span>}
+        </button>
+        <button
+          className={activeTab === "completed" ? "active" : ""}
+          onClick={() => setActiveTab("completed")}
+        >
+          ✅ Completed Duties
+          {completedDuties.length > 0 && <span className="tab-count">{completedDuties.length}</span>}
+        </button>
+      </div>
+
       {loading ? (
         <p style={{ color: "#888" }}>Loading...</p>
-      ) : duties.length === 0 ? (
-        <div className="empty-state">
-          <p>You haven't booked any locum duties yet.</p>
-          <button onClick={() => navigate("/doctor/dashboard")}>Browse Available Duties</button>
-        </div>
+      ) : activeTab === "active" ? (
+        activeDuties.length === 0 ? (
+          <div className="empty-state">
+            <p>No active locum duties.</p>
+            <button onClick={() => navigate("/doctor/dashboard")}>Browse Available Duties</button>
+          </div>
+        ) : (
+          <div className="duties-grid">
+            {activeDuties.map((duty) => {
+              const openCoverRequest = duty.cover_requests?.find(r => r.status === "open");
+              const acceptedCoverRequest = duty.cover_requests?.find(r => r.status === "accepted");
+              return (
+                <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "confirmed" : acceptedCoverRequest ? "cover-found" : "pending-card"}`}>
+                  <div className="duty-header">
+                    <h3>{duty.hospitals?.hospital_name || "Hospital"}</h3>
+                    <span className="pay">₹{(duty.doctor_pay || Math.round(duty.pay * 0.8)).toLocaleString()}</span>
+                  </div>
+                  <div className="duty-details">
+                    <p>📍 {duty.hospitals?.address || "—"}</p>
+                    <p>📅 {duty.date}</p>
+                    <p>🕐 {duty.start_time} - {duty.end_time}</p>
+                    <p>🎓 {duty.qualification}</p>
+                    {duty.booking_status === "confirmed" && (
+                      <>
+                        <p>📞 {duty.hospitals?.phone || "—"}</p>
+                        <p>✉️ {duty.hospitals?.email || "—"}</p>
+                      </>
+                    )}
+                    {duty.notes && <p>📝 {duty.notes}</p>}
+                  </div>
+                  {getStatusBadge(duty)}
+                  {!openCoverRequest && !acceptedCoverRequest && duty.booking_status !== "confirmed" && (
+                    <p className="verification-note">The hospital is reviewing your credentials.</p>
+                  )}
+                  {openCoverRequest && (
+                    <div className="cover-request-info">
+                      <p>🔍 Your cover request is active.</p>
+                      <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Reason: {openCoverRequest.reason}</p>
+                    </div>
+                  )}
+                  {acceptedCoverRequest && (
+                    <div className="cover-accepted-info">
+                      <p>✅ A doctor has agreed to cover your duty.</p>
+                    </div>
+                  )}
+                  {!openCoverRequest && !acceptedCoverRequest && !duty.completed && (
+                    <button className="cover-btn" onClick={() => { setRequestingCover(duty); setCoverReason(""); }}>
+                      🔄 Request Cover
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       ) : (
-        <div className="duties-grid">
-          {duties.map((duty) => {
-            const openCoverRequest = duty.cover_requests?.find(r => r.status === "open");
-            const acceptedCoverRequest = duty.cover_requests?.find(r => r.status === "accepted");
-            return (
-              <div key={duty.id} className={`duty-card ${duty.booking_status === "confirmed" ? "confirmed" : acceptedCoverRequest ? "cover-found" : "pending-card"}`}>
+        completedDuties.length === 0 ? (
+          <div className="empty-state">
+            <p>No completed duties yet.</p>
+          </div>
+        ) : (
+          <div className="duties-grid">
+            {completedDuties.map((duty) => (
+              <div key={duty.id} className="duty-card completed-card">
                 <div className="duty-header">
                   <h3>{duty.hospitals?.hospital_name || "Hospital"}</h3>
                   <span className="pay">₹{(duty.doctor_pay || Math.round(duty.pay * 0.8)).toLocaleString()}</span>
@@ -97,63 +182,30 @@ function DoctorLocums() {
                   <p>📅 {duty.date}</p>
                   <p>🕐 {duty.start_time} - {duty.end_time}</p>
                   <p>🎓 {duty.qualification}</p>
-                  {duty.booking_status === "confirmed" && (
-                    <>
-                      <p>📞 {duty.hospitals?.phone || "—"}</p>
-                      <p>✉️ {duty.hospitals?.email || "—"}</p>
-                    </>
-                  )}
                   {duty.notes && <p>📝 {duty.notes}</p>}
                 </div>
-
-                {getStatusBadge(duty)}
-
-                {!openCoverRequest && !acceptedCoverRequest && duty.booking_status !== "confirmed" && (
-                  <p className="verification-note">
-                    The hospital is reviewing your credentials. You will be notified once confirmed.
-                  </p>
-                )}
-
-                {openCoverRequest && (
-                  <div className="cover-request-info">
-                    <p>🔍 Your cover request is active. Waiting for another doctor to accept.</p>
-                    <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Reason: {openCoverRequest.reason || coverReason}</p>
+                {getReviewBadge(duty)}
+                {duty.review_comment && (
+                  <div className="review-note">
+                    <p>💬 {duty.review_comment}</p>
                   </div>
-                )}
-
-                {acceptedCoverRequest && (
-                  <div className="cover-accepted-info">
-                    <p>✅ A doctor has agreed to cover your duty. You are released from this duty.</p>
-                  </div>
-                )}
-
-                {!openCoverRequest && !acceptedCoverRequest && !duty.completed && (
-                  <button className="cover-btn" onClick={() => { setRequestingCover(duty); setCoverReason(""); }}>
-                    🔄 Request Cover
-                  </button>
                 )}
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )
       )}
 
       {requestingCover && (
         <div className="modal-overlay" onClick={() => setRequestingCover(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2>Request Cover</h2>
-            <p style={{ color: "#888", marginBottom: 8 }}>
-              {requestingCover.hospitals?.hospital_name} — {requestingCover.date}
-            </p>
-            <p style={{ color: "#e65100", fontSize: 14, marginBottom: 20 }}>
-              ⚠️ You will remain responsible for this duty until another doctor accepts the cover.
-            </p>
-            <label style={{ display: "block", marginBottom: 8, fontWeight: 600, color: "#333" }}>
-              Reason for requesting cover
-            </label>
+            <p style={{ color: "#888", marginBottom: 8 }}>{requestingCover.hospitals?.hospital_name} — {requestingCover.date}</p>
+            <p style={{ color: "#e65100", fontSize: 14, marginBottom: 20 }}>⚠️ You remain responsible until another doctor accepts.</p>
+            <label style={{ display: "block", marginBottom: 8, fontWeight: 600, color: "#333" }}>Reason for requesting cover</label>
             <textarea
               className="cover-reason-input"
-              placeholder="Please explain why you need cover (e.g. medical emergency, family emergency)..."
+              placeholder="Please explain why you need cover..."
               value={coverReason}
               onChange={(e) => setCoverReason(e.target.value)}
               rows={4}
