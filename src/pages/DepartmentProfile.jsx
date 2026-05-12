@@ -63,11 +63,22 @@ function DepartmentProfile() {
       <form onSubmit={savePassword} className="profile-form">
         <div className="form-group">
           <label>New Password</label>
-          <input type="password" value={password.newPass} onChange={(e) => setPassword({ ...password, newPass: e.target.value })} required placeholder="Min. 6 characters" />
+          <input
+            type="password"
+            value={password.newPass}
+            onChange={(e) => setPassword({ ...password, newPass: e.target.value })}
+            required
+            placeholder="Min. 6 characters"
+          />
         </div>
         <div className="form-group">
           <label>Confirm New Password</label>
-          <input type="password" value={password.confirm} onChange={(e) => setPassword({ ...password, confirm: e.target.value })} required />
+          <input
+            type="password"
+            value={password.confirm}
+            onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
+            required
+          />
         </div>
         <button type="submit" className="save-btn" disabled={saving}>
           {saving ? "Saving..." : "Change Password"}

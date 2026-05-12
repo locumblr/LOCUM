@@ -108,13 +108,22 @@ function HospitalDashboard() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
     setHospitalId(user.id);
-    const { data } = await supabase.from("hospitals").select("hospital_name").eq("id", user.id).single();
-    if (data) setHospitalName(data.hospital_name);
+    const { data } = await supabase.from("hospitals").select("hospital_name, status").eq("id", user.id).single();
+    if (!data || data.status === "frozen") {
+      await supabase.auth.signOut();
+      navigate("/login");
+      return;
+    }
+    if (data.status === "rejected") {
+      await supabase.auth.signOut();
+      navigate("/login");
+      return;
+    }
+    setHospitalName(data.hospital_name);
     fetchDuties(user.id);
     fetchNotifications(user.id);
     fetchPendingInvoice(user.id);
   };
-
   const fetchDuties = async (uid) => {
     setLoading(true);
     const { data, error } = await supabase

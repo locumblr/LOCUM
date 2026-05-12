@@ -19,6 +19,15 @@ function HospitalLocums() {
 const fetchDuties = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
+
+    // Check hospital status
+    const { data: hospital } = await supabase.from("hospitals").select("status").eq("id", user.id).single();
+    if (!hospital || hospital.status === "frozen") {
+      await supabase.auth.signOut();
+      navigate("/login");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("locum_duties")
       .select("*, doctors(id, first_name, last_name, phone, email, qualification, experience, document_url)")
@@ -27,7 +36,6 @@ const fetchDuties = async () => {
     if (!error) setDuties(data || []);
     setLoading(false);
   };
-
   const viewDocument = async (documentUrl) => {
     if (!documentUrl) { alert("No document uploaded by this professional."); return; }
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(documentUrl, 60);
