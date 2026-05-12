@@ -206,8 +206,7 @@ function HospitalDashboard() {
       .from("locum_duties")
       .select("*, doctors(first_name, last_name), nurses(first_name, last_name)")
       .eq("hospital_id", invoice.hospital_id)
-      .eq("completed", true)
-      .neq("payment_status", "paid");
+      .eq("completed", true);
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
