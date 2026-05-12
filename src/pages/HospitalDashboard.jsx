@@ -573,8 +573,12 @@ function HospitalDashboard() {
                 <div className="qual-dropdown-list">
                   {(showForm === "nurse" ? nursingQualifications : allQualifications).map((q) => (
                     <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}>
-                      <input type="checkbox" checked={form.qualifications.includes(q)} onChange={() => toggleQualification(q)} style={{ marginRight: 8 }} />
-                      {q}
+                      <input
+                        type="checkbox"
+                        checked={form.qualifications.includes(q)}
+                        onChange={() => toggleQualification(q)}
+                      />
+                      <span>{q}</span>
                     </label>
                   ))}
                 </div>
