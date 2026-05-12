@@ -201,8 +201,7 @@ function HospitalDashboard() {
   };
 
  const generateInvoicePDF = async (invoice) => {
-    // Fetch individual duties
-   const { data: duties } = await supabase
+    const { data: duties } = await supabase
       .from("locum_duties")
       .select("*")
       .eq("hospital_id", invoice.hospital_id)
@@ -219,7 +218,6 @@ function HospitalDashboard() {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Header
     doc.setFillColor(30, 58, 95);
     doc.rect(0, 0, pageWidth, 40, "F");
     doc.setTextColor(255, 255, 255);
@@ -231,13 +229,11 @@ function HospitalDashboard() {
     doc.text("Healthcare Technologies, Bangalore, India", 20, 32);
     doc.text("locum.blr@gmail.com", pageWidth - 20, 32, { align: "right" });
 
-    // Invoice title
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.text("INVOICE", pageWidth - 20, 55, { align: "right" });
 
-    // Invoice details
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
@@ -246,7 +242,6 @@ function HospitalDashboard() {
     doc.text(`Date: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - 20, 70, { align: "right" });
     doc.text(`Due Date: ${invoice.due_date}`, pageWidth - 20, 77, { align: "right" });
 
-    // Bill To
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -256,12 +251,10 @@ function HospitalDashboard() {
     doc.setFontSize(10);
     doc.text(hospitalName, 20, 63);
 
-    // Divider
     doc.setDrawColor(30, 58, 95);
     doc.setLineWidth(0.5);
     doc.line(20, 85, pageWidth - 20, 85);
 
-    // Billing period
     const [year, month] = invoice.billing_month.split("-");
     const monthLabel = new Date(year, month - 1).toLocaleString("default", { month: "long", year: "numeric" });
     doc.setTextColor(30, 58, 95);
@@ -269,7 +262,6 @@ function HospitalDashboard() {
     doc.setFont("helvetica", "bold");
     doc.text(`Billing Period: ${monthLabel}`, 20, 95);
 
-    // Individual duties table
     const dutyRows = (duties || []).map(duty => {
       let staffName = "—";
       if (duty.booked_by) {
@@ -307,8 +299,6 @@ function HospitalDashboard() {
     });
 
     const summaryY = doc.lastAutoTable.finalY + 8;
-
-    // Summary table
     autoTable(doc, {
       startY: summaryY,
       body: [
@@ -319,11 +309,12 @@ function HospitalDashboard() {
       ],
       bodyStyles: { fontSize: 10, font: "helvetica" },
       columnStyles: {
-        0: { cellWidth: 140, fontStyle: "normal", textColor: [80, 80, 80] },
+        0: { cellWidth: 140, textColor: [80, 80, 80] },
         1: { cellWidth: 30, halign: "right" },
       },
       didParseCell: (data) => {
-        if (data.row.index === (invoice.fine_amount > 0 ? 3 : 2)) {
+        const lastRow = invoice.fine_amount > 0 ? 3 : 2;
+        if (data.row.index === lastRow) {
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.textColor = [30, 58, 95];
           data.cell.styles.fontSize = 11;
@@ -335,8 +326,6 @@ function HospitalDashboard() {
     });
 
     const finalY = doc.lastAutoTable.finalY + 12;
-
-    // Payment terms
     doc.setFillColor(240, 244, 248);
     doc.rect(20, finalY, pageWidth - 40, 28, "F");
     doc.setTextColor(30, 58, 95);
@@ -348,7 +337,6 @@ function HospitalDashboard() {
     doc.text(`Payment due by ${invoice.due_date}. Late payments attract a fine of Rs.500 per week.`, 28, finalY + 18);
     doc.text("Accounts frozen for non-payment beyond 14 days.", 28, finalY + 25);
 
-    // Payment details
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -357,7 +345,6 @@ function HospitalDashboard() {
     doc.setTextColor(80, 80, 80);
     doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 52);
 
-    // Paid stamp
     if (invoice.status === "paid") {
       doc.setTextColor(46, 125, 50);
       doc.setFontSize(28);
@@ -365,7 +352,6 @@ function HospitalDashboard() {
       doc.text("PAID", pageWidth - 20, finalY + 52, { align: "right" });
     }
 
-    // Footer
     doc.setDrawColor(200, 200, 200);
     doc.line(20, doc.internal.pageSize.getHeight() - 20, pageWidth - 20, doc.internal.pageSize.getHeight() - 20);
     doc.setFontSize(9);

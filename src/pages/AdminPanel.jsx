@@ -68,25 +68,20 @@ function AdminPanel() {
     const confirmed = window.confirm("Generate invoices for all hospitals for the previous month? Hospitals will be notified automatically.");
     if (!confirmed) return;
     setGeneratingInvoice(true);
-
     const now = new Date();
     const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1);
     const billingMonth = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
     const dueDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-15`;
-
-    // Fetch fresh data directly
     const { data: freshDuties } = await supabase
       .from("locum_duties")
       .select("*, hospitals(hospital_name, email, phone)")
       .eq("completed", true)
       .neq("payment_status", "paid");
-
     if (!freshDuties || freshDuties.length === 0) {
       alert("No completed unpaid duties found to invoice.");
       setGeneratingInvoice(false);
       return;
     }
-
     const byHospital = freshDuties.reduce((acc, duty) => {
       const hid = duty.hospital_id;
       if (!hid) return acc;
@@ -98,19 +93,16 @@ function AdminPanel() {
       acc[hid].total_platform_fee += duty.platform_fee || 0;
       return acc;
     }, {});
-
     let count = 0;
     for (const hid of Object.keys(byHospital)) {
       const h = byHospital[hid];
       if (h.duties.length === 0 || h.total_platform_fee === 0) continue;
-
       const { data: existing } = await supabase
         .from("monthly_invoices")
         .select("id")
         .eq("hospital_id", hid)
         .eq("billing_month", billingMonth)
         .single();
-
       if (!existing) {
         await supabase.from("monthly_invoices").insert({
           hospital_id: hid,
@@ -126,22 +118,79 @@ function AdminPanel() {
           admin_verified: false,
           weeks_overdue: 0,
         });
-
         await supabase.from("notifications").insert({
           user_id: hid,
           title: `📋 Invoice for ${getMonthLabel(billingMonth)}`,
-          message: `Your invoice for ${getMonthLabel(billingMonth)} has been generated. Total due: ₹${h.total_platform_fee.toLocaleString()}. Payment due by ${dueDateStr}. Late payments attract a Rs500/week fine and account suspension.`,
+          message: `Your invoice for ${getMonthLabel(billingMonth)} has been generated. Total due: Rs.${h.total_platform_fee.toLocaleString()}. Payment due by ${dueDateStr}. Late payments attract a Rs.500/week fine and account suspension.`,
         });
         count++;
       }
     }
-
     alert(`${count} invoice(s) generated and hospitals notified!`);
     fetchBilling();
     setGeneratingInvoice(false);
   };
+
   const generateInvoicePDF = async (invoice) => {
-    // Fetch individual duties for this invoice
+    const { data: duties } = await supabase
+      .from("locum_duties")
+      .select("*")
+      .eq("hospital_id", invoice.hospital_id)
+      .eq("completed", true);
+    const { data: doctorDetails } = await supabase
+      .from("doctors")
+      .select("id, first_name, last_name");
+    const { data: nurseDetails } = await supabase
+      .from("nurses")
+      .select("id, first_name, last_name");
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(30, 58, 95);
+    doc.rect(0, 0, pageWidth, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("LOCUM", 20, 22);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Healthcare Technologies, Bangalore, India", 20, 32);
+    doc.text("locum.blr@gmail.com", pageWidth - 20, 32, { align: "right" });
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("INVOICE", pageWidth - 20, 55, { align: "right" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    const invoiceNumber = `INV-${invoice.billing_month}-${invoice.hospital_id?.slice(0, 6).toUpperCase()}`;
+    doc.text(`Invoice No: ${invoiceNumber}`, pageWidth - 20, 63, { align: "right" });
+    doc.text(`Date: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - 20, 70, { align: "right" });
+    doc.text(`Due Date: ${invoice.due_date}`, pageWidth - 20, 77, { align: "right" });
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill To:", 20, 55);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(10);
+    doc.text(invoice.hospitals?.hospital_name || "Hospital", 20, 63);
+    doc.text(invoice.hospitals?.email || "", 20, 70);
+    doc.text(invoice.hospitals?.phone || "", 20, 77);
+
+    doc.setDrawColor(30, 58, 95);
+    doc.setLineWidth(0.5);
+    doc.line(20, 85, pageWidth - 20, 85);
+
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Billing Period: ${getMonthLabel(invoice.billing_month)}`, 20, 95);
+
     const dutyRows = (duties || []).map(duty => {
       let staffName = "—";
       if (duty.booked_by) {
@@ -155,74 +204,6 @@ function AdminPanel() {
         `${duty.start_time || ""} - ${duty.end_time || ""}`,
         duty.qualification || "—",
         staffName,
-        `Rs.${(duty.gross_pay || duty.pay || 0).toLocaleString("en-IN")}`,
-        `Rs.${(duty.platform_fee || 0).toLocaleString("en-IN")}`,
-      ];
-    });
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    // Header
-    doc.setFillColor(30, 58, 95);
-    doc.rect(0, 0, pageWidth, 40, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.text("LOCUM", 20, 22);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Healthcare Technologies, Bangalore, India", 20, 32);
-    doc.text("locum.blr@gmail.com", pageWidth - 20, 32, { align: "right" });
-
-    // Invoice title
-    doc.setTextColor(30, 58, 95);
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.text("INVOICE", pageWidth - 20, 55, { align: "right" });
-
-    // Invoice details
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    const invoiceNumber = `INV-${invoice.billing_month}-${invoice.hospital_id?.slice(0, 6).toUpperCase()}`;
-    doc.text(`Invoice No: ${invoiceNumber}`, pageWidth - 20, 63, { align: "right" });
-    doc.text(`Date: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - 20, 70, { align: "right" });
-    doc.text(`Due Date: ${invoice.due_date}`, pageWidth - 20, 77, { align: "right" });
-
-    // Bill To
-    doc.setTextColor(30, 58, 95);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("Bill To:", 20, 55);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(10);
-    doc.text(invoice.hospitals?.hospital_name || "Hospital", 20, 63);
-    doc.text(invoice.hospitals?.email || "", 20, 70);
-    doc.text(invoice.hospitals?.phone || "", 20, 77);
-
-    // Divider
-    doc.setDrawColor(30, 58, 95);
-    doc.setLineWidth(0.5);
-    doc.line(20, 85, pageWidth - 20, 85);
-
-    // Billing period
-    doc.setTextColor(30, 58, 95);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Billing Period: ${getMonthLabel(invoice.billing_month)}`, 20, 95);
-
-    // Individual duties table
-    const dutyRows = (duties || []).map(duty => {
-      const staffName = duty.duty_type === "nurse"
-        ? `${duty.nurses?.first_name || ""} ${duty.nurses?.last_name || ""}`
-        : `Dr. ${duty.doctors?.first_name || ""} ${duty.doctors?.last_name || ""}`;
-      return [
-        duty.date,
-        `${duty.start_time} - ${duty.end_time}`,
-        duty.qualification || "—",
-        staffName.trim() || "—",
         `Rs.${(duty.gross_pay || duty.pay || 0).toLocaleString("en-IN")}`,
         `Rs.${(duty.platform_fee || 0).toLocaleString("en-IN")}`,
       ];
@@ -247,8 +228,6 @@ function AdminPanel() {
     });
 
     const summaryY = doc.lastAutoTable.finalY + 8;
-
-    // Summary table
     autoTable(doc, {
       startY: summaryY,
       body: [
@@ -257,14 +236,14 @@ function AdminPanel() {
         ...(invoice.fine_amount > 0 ? [["Late Payment Fine", `Rs.${invoice.fine_amount.toLocaleString("en-IN")}`]] : []),
         ["TOTAL DUE", `Rs.${(invoice.total_due || 0).toLocaleString("en-IN")}`],
       ],
-      headStyles: { fillColor: [30, 58, 95], textColor: 255 },
       bodyStyles: { fontSize: 10, font: "helvetica" },
       columnStyles: {
-        0: { cellWidth: 140, fontStyle: "normal", textColor: [80, 80, 80] },
-        1: { cellWidth: 30, halign: "right", fontStyle: "normal" },
+        0: { cellWidth: 140, textColor: [80, 80, 80] },
+        1: { cellWidth: 30, halign: "right" },
       },
       didParseCell: (data) => {
-        if (data.row.index === (invoice.fine_amount > 0 ? 3 : 2)) {
+        const lastRow = invoice.fine_amount > 0 ? 3 : 2;
+        if (data.row.index === lastRow) {
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.textColor = [30, 58, 95];
           data.cell.styles.fontSize = 11;
@@ -276,8 +255,6 @@ function AdminPanel() {
     });
 
     const finalY = doc.lastAutoTable.finalY + 12;
-
-    // Payment terms
     doc.setFillColor(240, 244, 248);
     doc.rect(20, finalY, pageWidth - 40, 28, "F");
     doc.setTextColor(30, 58, 95);
@@ -289,7 +266,6 @@ function AdminPanel() {
     doc.text(`Payment due by ${invoice.due_date}. Late payments attract a fine of Rs.500 per week.`, 28, finalY + 18);
     doc.text("Accounts frozen for non-payment beyond 14 days.", 28, finalY + 25);
 
-    // Payment details
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -298,7 +274,6 @@ function AdminPanel() {
     doc.setTextColor(80, 80, 80);
     doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 52);
 
-    // Paid stamp
     if (invoice.status === "paid") {
       doc.setTextColor(46, 125, 50);
       doc.setFontSize(28);
@@ -306,7 +281,6 @@ function AdminPanel() {
       doc.text("PAID", pageWidth - 20, finalY + 52, { align: "right" });
     }
 
-    // Footer
     doc.setDrawColor(200, 200, 200);
     doc.line(20, doc.internal.pageSize.getHeight() - 20, pageWidth - 20, doc.internal.pageSize.getHeight() - 20);
     doc.setFontSize(9);
@@ -316,6 +290,7 @@ function AdminPanel() {
 
     doc.save(`LOCUM-Invoice-${invoiceNumber}.pdf`);
   };
+
   const verifyPayment = async (invoiceId, hospitalId) => {
     const confirmed = window.confirm("Verify this payment and mark invoice as paid?");
     if (!confirmed) return;
@@ -356,7 +331,7 @@ function AdminPanel() {
     await supabase.from("notifications").insert({
       user_id: hospitalId,
       title: "⚠️ Late Payment Fine Added",
-      message: `A late payment fine of ₹500 has been added. New total due: ₹${newTotal.toLocaleString()}. Please clear dues immediately.`,
+      message: `A late payment fine of Rs.500 has been added. New total due: Rs.${newTotal.toLocaleString()}. Please clear dues immediately.`,
     });
     fetchBilling();
   };
@@ -631,11 +606,11 @@ function AdminPanel() {
             <div className="billing-section">
               <div className="billing-stats">
                 <div className="billing-stat unpaid">
-                  <h3>₹{unpaidInvoices.reduce((sum, i) => sum + (i.total_due || 0), 0).toLocaleString()}</h3>
+                  <h3>Rs.{unpaidInvoices.reduce((sum, i) => sum + (i.total_due || 0), 0).toLocaleString()}</h3>
                   <p>Total Outstanding</p>
                 </div>
                 <div className="billing-stat paid">
-                  <h3>₹{invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + (i.total_platform_fee || 0), 0).toLocaleString()}</h3>
+                  <h3>Rs.{invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + (i.total_platform_fee || 0), 0).toLocaleString()}</h3>
                   <p>Total Collected</p>
                 </div>
                 <div className="billing-stat total">
@@ -677,25 +652,19 @@ function AdminPanel() {
                             </div>
                             <div className="hospital-billing-total">
                               <span>Total Due</span>
-                              <strong>₹{(invoice.total_due || 0).toLocaleString()}</strong>
-                              {invoice.fine_amount > 0 && <p style={{ color: "#e74c3c", fontSize: 13 }}>incl. ₹{invoice.fine_amount} fine</p>}
+                              <strong>Rs.{(invoice.total_due || 0).toLocaleString()}</strong>
+                              {invoice.fine_amount > 0 && <p style={{ color: "#e74c3c", fontSize: 13 }}>incl. Rs.{invoice.fine_amount} fine</p>}
                             </div>
                           </div>
                           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                            <button
-                              onClick={() => verifyPayment(invoice.id, invoice.hospital_id)}
-                              style={{ padding: "10px 20px", background: "#27ae60", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}
-                            >
+                            <button onClick={() => verifyPayment(invoice.id, invoice.hospital_id)} style={{ padding: "10px 20px", background: "#27ae60", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
                               ✅ Verify Payment
                             </button>
-                            <button
-                              onClick={() => generateInvoicePDF(invoice)}
-                              style={{ padding: "10px 20px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}
-                            >
+                            <button onClick={() => generateInvoicePDF(invoice)} style={{ padding: "10px 20px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
                               📄 Download PDF
                             </button>
                           </div>
-                          <p style={{ fontSize: 13, color: "#888", marginTop: 8 }}>{invoice.total_duties} duties | Gross: ₹{(invoice.total_gross || 0).toLocaleString()}</p>
+                          <p style={{ fontSize: 13, color: "#888", marginTop: 8 }}>{invoice.total_duties} duties | Gross: Rs.{(invoice.total_gross || 0).toLocaleString()}</p>
                         </div>
                       ))}
                     </>
@@ -719,35 +688,26 @@ function AdminPanel() {
                               </div>
                               <div className="hospital-billing-total">
                                 <span>Total Due</span>
-                                <strong>₹{(invoice.total_due || 0).toLocaleString()}</strong>
-                                {invoice.fine_amount > 0 && <p style={{ color: "#e74c3c", fontSize: 13 }}>incl. ₹{invoice.fine_amount} fine</p>}
+                                <strong>Rs.{(invoice.total_due || 0).toLocaleString()}</strong>
+                                {invoice.fine_amount > 0 && <p style={{ color: "#e74c3c", fontSize: 13 }}>incl. Rs.{invoice.fine_amount} fine</p>}
                               </div>
                             </div>
                             <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                              <button
-                                onClick={() => generateInvoicePDF(invoice)}
-                                style={{ padding: "8px 16px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
-                              >
+                              <button onClick={() => generateInvoicePDF(invoice)} style={{ padding: "8px 16px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                                 📄 Download PDF
                               </button>
                               {isOverdue && (
                                 <>
-                                  <button
-                                    onClick={() => addWeeklyFine(invoice.id, invoice.fine_amount || 0, invoice.hospital_id)}
-                                    style={{ padding: "8px 16px", background: "#fff3e0", color: "#e65100", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
-                                  >
-                                    ➕ Add ₹500 Fine
+                                  <button onClick={() => addWeeklyFine(invoice.id, invoice.fine_amount || 0, invoice.hospital_id)} style={{ padding: "8px 16px", background: "#fff3e0", color: "#e65100", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                                    ➕ Add Rs.500 Fine
                                   </button>
-                                  <button
-                                    onClick={() => freezeForNonPayment(invoice.hospital_id)}
-                                    style={{ padding: "8px 16px", background: "#fce4ec", color: "#c62828", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
-                                  >
+                                  <button onClick={() => freezeForNonPayment(invoice.hospital_id)} style={{ padding: "8px 16px", background: "#fce4ec", color: "#c62828", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                                     🔴 Freeze Account
                                   </button>
                                 </>
                               )}
                             </div>
-                            <p style={{ fontSize: 13, color: "#888", marginTop: 8 }}>{invoice.total_duties} duties | Gross: ₹{(invoice.total_gross || 0).toLocaleString()}</p>
+                            <p style={{ fontSize: 13, color: "#888", marginTop: 8 }}>{invoice.total_duties} duties | Gross: Rs.{(invoice.total_gross || 0).toLocaleString()}</p>
                           </div>
                         );
                       })}
@@ -767,9 +727,9 @@ function AdminPanel() {
                               <td>{invoice.hospitals?.hospital_name}</td>
                               <td>{getMonthLabel(invoice.billing_month)}</td>
                               <td>{invoice.total_duties}</td>
-                              <td>₹{(invoice.total_platform_fee || 0).toLocaleString()}</td>
-                              <td>{invoice.fine_amount > 0 ? `₹${invoice.fine_amount}` : "—"}</td>
-                              <td>₹{(invoice.total_due || 0).toLocaleString()}</td>
+                              <td>Rs.{(invoice.total_platform_fee || 0).toLocaleString()}</td>
+                              <td>{invoice.fine_amount > 0 ? `Rs.${invoice.fine_amount}` : "—"}</td>
+                              <td>Rs.{(invoice.total_due || 0).toLocaleString()}</td>
                               <td>{invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString() : "—"}</td>
                               <td>
                                 <button onClick={() => generateInvoicePDF(invoice)} style={{ padding: "4px 10px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
