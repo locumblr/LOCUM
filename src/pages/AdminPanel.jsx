@@ -74,8 +74,20 @@ function AdminPanel() {
     const billingMonth = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
     const dueDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-15`;
 
-    const unpaidDuties = billing.filter(d => d.payment_status !== "paid" && d.completed);
-    const byHospital = unpaidDuties.reduce((acc, duty) => {
+    // Fetch fresh data directly
+    const { data: freshDuties } = await supabase
+      .from("locum_duties")
+      .select("*, hospitals(hospital_name, email, phone)")
+      .eq("completed", true)
+      .neq("payment_status", "paid");
+
+    if (!freshDuties || freshDuties.length === 0) {
+      alert("No completed unpaid duties found to invoice.");
+      setGeneratingInvoice(false);
+      return;
+    }
+
+    const byHospital = freshDuties.reduce((acc, duty) => {
       const hid = duty.hospital_id;
       if (!hid) return acc;
       if (!acc[hid]) {
@@ -90,13 +102,15 @@ function AdminPanel() {
     let count = 0;
     for (const hid of Object.keys(byHospital)) {
       const h = byHospital[hid];
-      if (h.duties.length === 0) continue;
+      if (h.duties.length === 0 || h.total_platform_fee === 0) continue;
+
       const { data: existing } = await supabase
         .from("monthly_invoices")
         .select("id")
         .eq("hospital_id", hid)
         .eq("billing_month", billingMonth)
         .single();
+
       if (!existing) {
         await supabase.from("monthly_invoices").insert({
           hospital_id: hid,
@@ -112,6 +126,7 @@ function AdminPanel() {
           admin_verified: false,
           weeks_overdue: 0,
         });
+
         await supabase.from("notifications").insert({
           user_id: hid,
           title: `📋 Invoice for ${getMonthLabel(billingMonth)}`,
@@ -120,11 +135,11 @@ function AdminPanel() {
         count++;
       }
     }
+
     alert(`${count} invoice(s) generated and hospitals notified!`);
     fetchBilling();
     setGeneratingInvoice(false);
   };
-
   const generateInvoicePDF = (invoice) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
