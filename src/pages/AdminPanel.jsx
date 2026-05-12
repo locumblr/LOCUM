@@ -142,11 +142,23 @@ function AdminPanel() {
   };
   const generateInvoicePDF = async (invoice) => {
     // Fetch individual duties for this invoice
-    const { data: duties } = await supabase
-      .from("locum_duties")
-      .select("*, doctors(first_name, last_name), nurses(first_name, last_name)")
-      .eq("hospital_id", invoice.hospital_id)
-      .eq("completed", true);
+    const dutyRows = (duties || []).map(duty => {
+      let staffName = "—";
+      if (duty.booked_by) {
+        const doctor = (doctorDetails || []).find(d => d.id === duty.booked_by);
+        const nurse = (nurseDetails || []).find(n => n.id === duty.booked_by);
+        if (doctor) staffName = `Dr. ${doctor.first_name} ${doctor.last_name}`;
+        else if (nurse) staffName = `${nurse.first_name} ${nurse.last_name}`;
+      }
+      return [
+        duty.date || "—",
+        `${duty.start_time || ""} - ${duty.end_time || ""}`,
+        duty.qualification || "—",
+        staffName,
+        `Rs.${(duty.gross_pay || duty.pay || 0).toLocaleString("en-IN")}`,
+        `Rs.${(duty.platform_fee || 0).toLocaleString("en-IN")}`,
+      ];
+    });
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();

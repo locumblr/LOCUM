@@ -202,11 +202,19 @@ function HospitalDashboard() {
 
  const generateInvoicePDF = async (invoice) => {
     // Fetch individual duties
-    const { data: duties } = await supabase
+   const { data: duties } = await supabase
       .from("locum_duties")
-      .select("*, doctors(first_name, last_name), nurses(first_name, last_name)")
+      .select("*")
       .eq("hospital_id", invoice.hospital_id)
       .eq("completed", true);
+
+    const { data: doctorDetails } = await supabase
+      .from("doctors")
+      .select("id, first_name, last_name");
+
+    const { data: nurseDetails } = await supabase
+      .from("nurses")
+      .select("id, first_name, last_name");
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -263,14 +271,18 @@ function HospitalDashboard() {
 
     // Individual duties table
     const dutyRows = (duties || []).map(duty => {
-      const staffName = duty.duty_type === "nurse"
-        ? `${duty.nurses?.first_name || ""} ${duty.nurses?.last_name || ""}`
-        : `Dr. ${duty.doctors?.first_name || ""} ${duty.doctors?.last_name || ""}`;
+      let staffName = "—";
+      if (duty.booked_by) {
+        const doctor = (doctorDetails || []).find(d => d.id === duty.booked_by);
+        const nurse = (nurseDetails || []).find(n => n.id === duty.booked_by);
+        if (doctor) staffName = `Dr. ${doctor.first_name} ${doctor.last_name}`;
+        else if (nurse) staffName = `${nurse.first_name} ${nurse.last_name}`;
+      }
       return [
-        duty.date,
-        `${duty.start_time} - ${duty.end_time}`,
+        duty.date || "—",
+        `${duty.start_time || ""} - ${duty.end_time || ""}`,
         duty.qualification || "—",
-        staffName.trim() || "—",
+        staffName,
         `Rs.${(duty.gross_pay || duty.pay || 0).toLocaleString("en-IN")}`,
         `Rs.${(duty.platform_fee || 0).toLocaleString("en-IN")}`,
       ];
