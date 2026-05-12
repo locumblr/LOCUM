@@ -533,7 +533,7 @@ function HospitalDashboard() {
       </div>
 
       {showForm && (
-        <form onSubmit={submit} className="duty-form">
+        <form onSubmit={submit} className="duty-form" style={{ overflow: "hidden" }}>
           <h2>Post a {showForm === "nurse" ? "Nurse" : "Doctor"} Locum Duty</h2>
           {showForm === "nurse" && (
             <div style={{ background: "#f3e5f5", border: "1px solid #6a0dad", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#4a0080" }}>

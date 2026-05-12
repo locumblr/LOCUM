@@ -63,3 +63,22 @@
   .qual-dropdown-list { position: fixed !important; left: 16px !important; right: 16px !important; max-height: 60vh !important; z-index: 999 !important; }
   .qual-tag { font-size: 11px !important; }
 }
+.duty-form {
+  overflow: hidden !important;
+  max-width: 100% !important;
+}
+
+.qual-dropdown-container {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}
+
+.qual-dropdown-trigger {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
