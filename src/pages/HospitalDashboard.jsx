@@ -200,7 +200,15 @@ function HospitalDashboard() {
     setMarkingPaid(false);
   };
 
- const generateInvoicePDF = (invoice) => {
+ const generateInvoicePDF = async (invoice) => {
+    // Fetch individual duties
+    const { data: duties } = await supabase
+      .from("locum_duties")
+      .select("*, doctors(first_name, last_name), nurses(first_name, last_name)")
+      .eq("hospital_id", invoice.hospital_id)
+      .eq("completed", true)
+      .neq("payment_status", "paid");
+
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -254,36 +262,72 @@ function HospitalDashboard() {
     doc.setFont("helvetica", "bold");
     doc.text(`Billing Period: ${monthLabel}`, 20, 95);
 
-    // Table
+    // Individual duties table
+    const dutyRows = (duties || []).map(duty => {
+      const staffName = duty.duty_type === "nurse"
+        ? `${duty.nurses?.first_name || ""} ${duty.nurses?.last_name || ""}`
+        : `Dr. ${duty.doctors?.first_name || ""} ${duty.doctors?.last_name || ""}`;
+      return [
+        duty.date,
+        `${duty.start_time} - ${duty.end_time}`,
+        duty.qualification || "—",
+        staffName.trim() || "—",
+        `Rs.${(duty.gross_pay || duty.pay || 0).toLocaleString("en-IN")}`,
+        `Rs.${(duty.platform_fee || 0).toLocaleString("en-IN")}`,
+      ];
+    });
+
     autoTable(doc, {
       startY: 102,
-      head: [["Description", "Details", "Amount"]],
-      body: [
-        [
-          "Locum Platform Fee",
-          `${invoice.total_duties} completed duties\nGross duty value: Rs.${(invoice.total_gross || 0).toLocaleString("en-IN")}`,
-          `Rs.${(invoice.total_platform_fee || 0).toLocaleString("en-IN")}`,
-        ],
-        ...(invoice.fine_amount > 0 ? [[
-          "Late Payment Fine",
-          `${invoice.weeks_overdue || 0} week(s) overdue`,
-          `Rs.${invoice.fine_amount.toLocaleString("en-IN")}`,
-        ]] : []),
-      ],
-      foot: [["", "Total Due", `Rs.${(invoice.total_due || 0).toLocaleString("en-IN")}`]],
-      headStyles: { fillColor: [30, 58, 95], textColor: 255, fontSize: 10, fontStyle: "bold" },
-      footStyles: { fillColor: [240, 244, 248], textColor: [30, 58, 95], fontSize: 11, fontStyle: "bold" },
-      bodyStyles: { fontSize: 10, textColor: [50, 50, 50], font: "helvetica" },
-      columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 95 }, 2: { cellWidth: 35, halign: "right" } },
+      head: [["Date", "Time", "Qualification", "Staff", "Gross Pay", "Platform Fee"]],
+      body: dutyRows,
+      headStyles: { fillColor: [30, 58, 95], textColor: 255, fontSize: 9, fontStyle: "bold" },
+      bodyStyles: { fontSize: 9, textColor: [50, 50, 50], font: "helvetica" },
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 55 },
+        3: { cellWidth: 40 },
+        4: { cellWidth: 22, halign: "right" },
+        5: { cellWidth: 25, halign: "right" },
+      },
       margin: { left: 20, right: 20 },
       styles: { font: "helvetica", overflow: "linebreak" },
     });
 
-    const finalY = doc.lastAutoTable.finalY + 16;
+    const summaryY = doc.lastAutoTable.finalY + 8;
+
+    // Summary table
+    autoTable(doc, {
+      startY: summaryY,
+      body: [
+        ["Total Gross Duty Value", `Rs.${(invoice.total_gross || 0).toLocaleString("en-IN")}`],
+        ["Platform Fee (20%)", `Rs.${(invoice.total_platform_fee || 0).toLocaleString("en-IN")}`],
+        ...(invoice.fine_amount > 0 ? [["Late Payment Fine", `Rs.${invoice.fine_amount.toLocaleString("en-IN")}`]] : []),
+        ["TOTAL DUE", `Rs.${(invoice.total_due || 0).toLocaleString("en-IN")}`],
+      ],
+      bodyStyles: { fontSize: 10, font: "helvetica" },
+      columnStyles: {
+        0: { cellWidth: 140, fontStyle: "normal", textColor: [80, 80, 80] },
+        1: { cellWidth: 30, halign: "right" },
+      },
+      didParseCell: (data) => {
+        if (data.row.index === (invoice.fine_amount > 0 ? 3 : 2)) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.textColor = [30, 58, 95];
+          data.cell.styles.fontSize = 11;
+          data.cell.styles.fillColor = [240, 244, 248];
+        }
+      },
+      margin: { left: 20, right: 20 },
+      styles: { font: "helvetica" },
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 12;
 
     // Payment terms
     doc.setFillColor(240, 244, 248);
-    doc.rect(20, finalY, pageWidth - 40, 30, "F");
+    doc.rect(20, finalY, pageWidth - 40, 28, "F");
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -297,17 +341,17 @@ function HospitalDashboard() {
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("Payment Details", 20, finalY + 46);
+    doc.text("Payment Details", 20, finalY + 44);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(80, 80, 80);
-    doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 54);
+    doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 52);
 
     // Paid stamp
     if (invoice.status === "paid") {
       doc.setTextColor(46, 125, 50);
       doc.setFontSize(28);
       doc.setFont("helvetica", "bold");
-      doc.text("PAID", pageWidth - 20, finalY + 54, { align: "right" });
+      doc.text("PAID", pageWidth - 20, finalY + 52, { align: "right" });
     }
 
     // Footer
@@ -319,8 +363,7 @@ function HospitalDashboard() {
     doc.text("LOCUM Healthcare Technologies | Bangalore, India | locum.blr@gmail.com", pageWidth / 2, doc.internal.pageSize.getHeight() - 12, { align: "center" });
 
     doc.save(`LOCUM-Invoice-${invoiceNumber}.pdf`);
-  };
-  
+  }; 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const toggleQualification = (q) => {
