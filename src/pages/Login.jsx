@@ -6,7 +6,7 @@ import logo from "../assets/logo.png";
 
 function Login() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForgot, setShowForgot] = useState(false);
@@ -15,27 +15,73 @@ function Login() {
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  const isDepartmentCode = (identifier) => {
+    // Department codes contain a hyphen and no @ symbol e.g. APOLLO-ICU
+    return !identifier.includes("@") && identifier.includes("-");
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
+      // Check if it's a department code
+      if (isDepartmentCode(form.identifier)) {
+        const { data: dept, error: deptError } = await supabase
+          .from("hospital_departments")
+          .select("*, hospitals(status, hospital_name)")
+          .eq("department_code", form.identifier.toUpperCase().trim())
+          .single();
+
+        if (deptError || !dept) {
+          setError("Invalid department code. Please check and try again.");
+          setLoading(false);
+          return;
+        }
+
+        if (dept.password !== form.password) {
+          setError("Incorrect password. Default password is 123456.");
+          setLoading(false);
+          return;
+        }
+
+        if (dept.hospitals?.status === "frozen") {
+          setError("This hospital account is currently suspended. Please contact support.");
+          setLoading(false);
+          return;
+        }
+
+        if (dept.hospitals?.status !== "active") {
+          setError("This hospital account is not yet active.");
+          setLoading(false);
+          return;
+        }
+
+        localStorage.setItem("dept_session", JSON.stringify({
+          id: dept.id,
+          hospital_id: dept.hospital_id,
+          department_name: dept.department_name,
+          department_code: dept.department_code,
+          fixed_pay: dept.fixed_pay,
+          hospital_name: dept.hospitals?.hospital_name,
+        }));
+
+        navigate("/department/dashboard");
+        return;
+      }
+
+      // Otherwise treat as email login
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: form.email,
+        email: form.identifier,
         password: form.password,
       });
-
       if (authError) throw authError;
 
       const role = data.user.user_metadata?.role;
 
       if (role === "doctor") {
-        const { data: doctor } = await supabase
-          .from("doctors")
-          .select("status")
-          .eq("id", data.user.id)
-          .single();
+        const { data: doctor } = await supabase.from("doctors").select("status").eq("id", data.user.id).single();
         if (doctor?.status === "frozen") {
           await supabase.auth.signOut();
           setError("Your account has been suspended. Please contact support.");
@@ -45,11 +91,7 @@ function Login() {
         navigate("/doctor/dashboard");
 
       } else if (role === "nurse") {
-        const { data: nurse } = await supabase
-          .from("nurses")
-          .select("status")
-          .eq("id", data.user.id)
-          .single();
+        const { data: nurse } = await supabase.from("nurses").select("status").eq("id", data.user.id).single();
         if (!nurse) {
           await supabase.auth.signOut();
           setError("Nurse account not found. Please register again.");
@@ -65,11 +107,7 @@ function Login() {
         navigate("/nurse/dashboard");
 
       } else if (role === "hospital") {
-        const { data: hospital } = await supabase
-          .from("hospitals")
-          .select("status")
-          .eq("id", data.user.id)
-          .single();
+        const { data: hospital } = await supabase.from("hospitals").select("status").eq("id", data.user.id).single();
         if (hospital?.status === "pending") {
           await supabase.auth.signOut();
           setError("Your account is still under review. You will be notified once approved.");
@@ -118,18 +156,19 @@ function Login() {
   return (
     <div className="login-container">
       <img src={logo} alt="LOCUM" className="login-logo" />
-
       {!showForgot ? (
         <>
           <p>Sign in to your account</p>
           {error && <p className="error-msg">{error}</p>}
           <form onSubmit={submit} className="login-form">
             <input
-              name="email"
-              type="email"
-              placeholder="Email Address"
+              name="identifier"
+              type="text"
+              placeholder="Email or Department Code (e.g. APOLLO-ICU)"
               required
               onChange={handle}
+              value={form.identifier}
+              style={{ textTransform: form.identifier.includes("@") ? "none" : "uppercase" }}
             />
             <input
               name="password"
@@ -137,14 +176,13 @@ function Login() {
               placeholder="Password"
               required
               onChange={handle}
+              value={form.password}
             />
             <button type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Login"}
             </button>
           </form>
-          <p className="forgot-link" onClick={() => setShowForgot(true)}>
-            Forgot Password?
-          </p>
+          <p className="forgot-link" onClick={() => setShowForgot(true)}>Forgot Password?</p>
           <p className="switch-link">
             Don't have an account?{" "}
             <span onClick={() => navigate("/register")}>Register here</span>
