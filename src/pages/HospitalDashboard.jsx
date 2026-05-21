@@ -5,78 +5,34 @@ import "./HospitalDashboard.css";
 
 const allQualifications = [
   "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
-  "MD - General Medicine",
-  "MD - Paediatrics",
-  "MD - Psychiatry",
-  "MD - Dermatology",
-  "MD - Anaesthesiology",
-  "MD - Radiology",
-  "MD - Radiology with PCPNDT Certification",
-  "MD - Pathology",
-  "MD - Microbiology",
-  "MD - Biochemistry",
-  "MD - Community Medicine",
-  "MS - General Surgery",
-  "MS - Orthopaedics",
-  "MS - Ophthalmology",
-  "MS - ENT (Otorhinolaryngology)",
-  "MS - Obstetrics & Gynaecology",
-  "MCh - Neurosurgery",
-  "MCh - Cardiothoracic Surgery",
-  "MCh - Plastic Surgery",
-  "MCh - Urology",
-  "DM - Cardiology",
-  "DM - Neurology",
-  "DM - Nephrology",
-  "DM - Gastroenterology",
-  "DM - Endocrinology",
-  "DM - Oncology",
-  "DNB - General Medicine",
-  "DNB - General Surgery",
-  "DNB - Paediatrics",
-  "DNB - Obstetrics & Gynaecology",
-  "DNB - Orthopaedics",
-  "DNB - Anaesthesiology",
-  "BDS / MDS (Dentistry)",
-  "B.Pharm / M.Pharm (Pharmacy)",
-  "B.Sc Nursing / M.Sc Nursing",
-  "Diploma in Anaesthesiology (DA)",
-  "Diploma in Child Health (DCH)",
-  "Diploma in Obstetrics & Gynaecology (DGO)",
-  "Diploma in Orthopaedics (D.Ortho)",
-  "Diploma in Ophthalmology (DO)",
-  "Diploma in ENT",
-  "Diploma in Radiology (DMRD)",
+  "MD - General Medicine", "MD - Paediatrics", "MD - Psychiatry",
+  "MD - Dermatology", "MD - Anaesthesiology", "MD - Radiology",
+  "MD - Radiology with PCPNDT Certification", "MD - Pathology",
+  "MD - Microbiology", "MD - Biochemistry", "MD - Community Medicine",
+  "MS - General Surgery", "MS - Orthopaedics", "MS - Ophthalmology",
+  "MS - ENT (Otorhinolaryngology)", "MS - Obstetrics & Gynaecology",
+  "MCh - Neurosurgery", "MCh - Cardiothoracic Surgery", "MCh - Plastic Surgery",
+  "MCh - Urology", "DM - Cardiology", "DM - Neurology", "DM - Nephrology",
+  "DM - Gastroenterology", "DM - Endocrinology", "DM - Oncology",
+  "DNB - General Medicine", "DNB - General Surgery", "DNB - Paediatrics",
+  "DNB - Obstetrics & Gynaecology", "DNB - Orthopaedics", "DNB - Anaesthesiology",
+  "BDS / MDS (Dentistry)", "B.Pharm / M.Pharm (Pharmacy)", "B.Sc Nursing / M.Sc Nursing",
+  "Diploma in Anaesthesiology (DA)", "Diploma in Child Health (DCH)",
+  "Diploma in Obstetrics & Gynaecology (DGO)", "Diploma in Orthopaedics (D.Ortho)",
+  "Diploma in Ophthalmology (DO)", "Diploma in ENT", "Diploma in Radiology (DMRD)",
   "Diploma in Radiology (DMRD) with PCPNDT Certification",
-  "PCPNDT Certified Sonologist",
-  "Fellowship in Emergency Medicine (FCEM)",
-  "Other",
+  "PCPNDT Certified Sonologist", "Fellowship in Emergency Medicine (FCEM)", "Other",
 ];
 
 const nursingQualifications = [
-  "GNM (General Nursing & Midwifery)",
-  "B.Sc Nursing",
-  "Post Basic B.Sc Nursing",
-  "M.Sc Nursing",
-  "Critical Care Nursing",
-  "Operation Theatre Nursing",
-  "Emergency & Trauma Nursing",
-  "Paediatric Nursing",
-  "Oncology Nursing",
-  "Dialysis Nursing",
-  "ICU Nursing",
-  "NICU Nursing",
-  "PICU Nursing",
-  "Midwifery",
-  "Community Health Nursing",
-  "Psychiatric Nursing",
-  "Other",
+  "GNM (General Nursing & Midwifery)", "B.Sc Nursing", "Post Basic B.Sc Nursing",
+  "M.Sc Nursing", "Critical Care Nursing", "Operation Theatre Nursing",
+  "Emergency & Trauma Nursing", "Paediatric Nursing", "Oncology Nursing",
+  "Dialysis Nursing", "ICU Nursing", "NICU Nursing", "PICU Nursing",
+  "Midwifery", "Community Health Nursing", "Psychiatric Nursing", "Other",
 ];
 
-const emptyForm = {
-  date: "", start_time: "", end_time: "",
-  qualifications: [], pay: "", notes: "",
-};
+const emptyForm = { date: "", start_time: "", end_time: "", qualifications: [], pay: "", notes: "" };
 
 const isRadiology = (qualifications) =>
   qualifications.some(q =>
@@ -99,6 +55,7 @@ function HospitalDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showQualDropdown, setShowQualDropdown] = useState(false);
   const [pendingInvoice, setPendingInvoice] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     fetchHospitalData();
@@ -109,12 +66,7 @@ function HospitalDashboard() {
     if (!user) { navigate("/login"); return; }
     setHospitalId(user.id);
     const { data } = await supabase.from("hospitals").select("hospital_name, status").eq("id", user.id).single();
-    if (!data || data.status === "frozen") {
-      await supabase.auth.signOut();
-      navigate("/login");
-      return;
-    }
-    if (data.status === "rejected") {
+    if (!data || data.status === "frozen" || data.status === "rejected") {
       await supabase.auth.signOut();
       navigate("/login");
       return;
@@ -124,6 +76,7 @@ function HospitalDashboard() {
     fetchNotifications(user.id);
     fetchPendingInvoice(user.id);
   };
+
   const fetchDuties = async (uid) => {
     setLoading(true);
     const { data, error } = await supabase
@@ -157,9 +110,7 @@ function HospitalDashboard() {
         .limit(1)
         .single();
       if (data) setPendingInvoice(data);
-    } catch (e) {
-      setPendingInvoice(null);
-    }
+    } catch (e) { setPendingInvoice(null); }
   };
 
   const markAllRead = async () => {
@@ -239,7 +190,8 @@ function HospitalDashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* Payment Due Banner */}
+
+      {/* Payment Banner */}
       {pendingInvoice && !pendingInvoice.payment_requested && (
         <div style={{
           background: pendingInvoice.weeks_overdue > 0 ? "#c62828" : "#e65100",
@@ -248,60 +200,66 @@ function HospitalDashboard() {
           flexWrap: "wrap", gap: 10,
         }}>
           <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>
-            {pendingInvoice.weeks_overdue > 0 ? "🔴 Account at risk — Payment Overdue!" : "⚠️ Invoice pending payment"}
+            {pendingInvoice.weeks_overdue > 0 ? "🔴 Payment Overdue!" : "⚠️ Invoice pending"}
             {" "} Rs.{pendingInvoice.total_due?.toLocaleString()} due by {pendingInvoice.due_date}
           </p>
-          <button
-            onClick={() => navigate("/hospital/profile")}
-            style={{ padding: "8px 16px", background: "white", color: "#1e3a5f", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}
-          >
+          <button onClick={() => navigate("/hospital/profile")}
+            style={{ padding: "8px 16px", background: "white", color: "#1e3a5f", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
             View & Pay →
           </button>
         </div>
       )}
 
       {pendingInvoice?.payment_requested && !pendingInvoice?.admin_verified && (
-        <div style={{
-          background: "#1565c0", color: "white", padding: "12px 20px",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
+        <div style={{ background: "#1565c0", color: "white", padding: "12px 20px" }}>
           <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>⏳ Payment submitted — awaiting admin verification</p>
         </div>
       )}
 
+      {/* Header */}
       <div className="dashboard-header">
         <div>
           <h1>Hospital Dashboard</h1>
           {hospitalName && <p style={{ color: "#888", fontSize: 14 }}>{hospitalName}</p>}
         </div>
         <div className="header-buttons">
-          <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}>
-            🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-          </button>
           <button onClick={() => navigate("/hospital/locums")}>My Locums</button>
           <button onClick={() => navigate("/hospital/profile")}>Profile</button>
-          <button onClick={() => navigate("/help")}>Help</button>
-          <button className="logout" onClick={logout}>Logout</button>
+          <div style={{ position: "relative" }}>
+            <button className="menu-btn" onClick={() => setShowMenu(!showMenu)}>
+              {unreadCount > 0 && <span className="notif-dot" />}
+              ⋮
+            </button>
+            {showMenu && (
+              <div className="dropdown-menu">
+                <button onClick={() => { setShowNotifications(!showNotifications); markAllRead(); setShowMenu(false); }}>
+                  🔔 Notifications {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+                </button>
+                <button onClick={() => { navigate("/help"); setShowMenu(false); }}>❓ Help</button>
+                <button className="logout-item" onClick={logout}>🚪 Logout</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Notifications Panel */}
       {showNotifications && (
         <div className="notifications-panel">
           <h3>🔔 Notifications</h3>
           {notifications.length === 0 ? (
             <p className="no-notif">No notifications yet</p>
-          ) : (
-            notifications.map(n => (
-              <div key={n.id} className={`notif-item ${n.read ? "read" : "unread"}`}>
-                <p className="notif-title">{n.title}</p>
-                <p className="notif-message">{n.message}</p>
-                <p className="notif-time">{new Date(n.created_at).toLocaleDateString()}</p>
-              </div>
-            ))
-          )}
+          ) : notifications.map(n => (
+            <div key={n.id} className={`notif-item ${n.read ? "read" : "unread"}`}>
+              <p className="notif-title">{n.title}</p>
+              <p className="notif-message">{n.message}</p>
+              <p className="notif-time">{new Date(n.created_at).toLocaleDateString()}</p>
+            </div>
+          ))}
         </div>
       )}
 
+      {/* Post Buttons */}
       <div className="post-section">
         <button className="post-btn" onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); setForm(emptyForm); }}>
           {showForm === "doctor" ? "Cancel" : "+ Post Doctor Locum"}
@@ -311,6 +269,7 @@ function HospitalDashboard() {
         </button>
       </div>
 
+      {/* Post Form */}
       {showForm && (
         <form onSubmit={submit} className="duty-form" style={{ overflow: "hidden" }}>
           <h2>Post a {showForm === "nurse" ? "Nurse" : "Doctor"} Locum Duty</h2>
@@ -333,15 +292,11 @@ function HospitalDashboard() {
               <input name="end_time" type="time" required onChange={handle} value={form.end_time} />
             </div>
           </div>
-
           <div className="form-group">
-            <label>
-              Required Qualifications{" "}
-              {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>}
-            </label>
+            <label>Required Qualifications {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>}</label>
             {isRadiology(form.qualifications) && (
-              <div style={{ background: "#fff8e1", border: "1px solid #ffcc02", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#795500", marginBottom: 8, lineHeight: 1.5 }}>
-                ⚠️ <strong>PCPNDT Notice:</strong> Radiologists performing USG/Ultrasound procedures must hold a valid <strong>PCPNDT registration</strong>. Please select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
+              <div style={{ background: "#fff8e1", border: "1px solid #ffcc02", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#795500", marginBottom: 8 }}>
+                ⚠️ <strong>PCPNDT Notice:</strong> Select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
               </div>
             )}
             <div className="qual-dropdown-container">
@@ -355,11 +310,7 @@ function HospitalDashboard() {
                 <div className="qual-dropdown-list">
                   {(showForm === "nurse" ? nursingQualifications : allQualifications).map((q) => (
                     <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}>
-                      <input
-                        type="checkbox"
-                        checked={form.qualifications.includes(q)}
-                        onChange={() => toggleQualification(q)}
-                      />
+                      <input type="checkbox" checked={form.qualifications.includes(q)} onChange={() => toggleQualification(q)} />
                       <span>{q}</span>
                     </label>
                   ))}
@@ -369,14 +320,11 @@ function HospitalDashboard() {
             {form.qualifications.length > 0 && (
               <div className="selected-quals">
                 {form.qualifications.map(q => (
-                  <span key={q} className="qual-tag">
-                    {q}<button type="button" onClick={() => toggleQualification(q)}>×</button>
-                  </span>
+                  <span key={q} className="qual-tag">{q}<button type="button" onClick={() => toggleQualification(q)}>×</button></span>
                 ))}
               </div>
             )}
           </div>
-
           <div className="form-group">
             <label>Total Pay (Rs.)</label>
             <input name="pay" placeholder="e.g. 10000" type="number" required onChange={handle} value={form.pay} />
@@ -393,7 +341,6 @@ function HospitalDashboard() {
               </div>
             )}
           </div>
-
           <div className="form-group">
             <label>Additional Notes (optional)</label>
             <textarea name="notes" placeholder="Any special requirements..." onChange={handle} value={form.notes} rows={3} />

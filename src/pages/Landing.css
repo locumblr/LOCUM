@@ -7,7 +7,6 @@
   overflow-x: hidden;
 }
 
-/* NAV */
 .landing-nav {
   display: flex;
   align-items: center;
@@ -68,9 +67,11 @@
   display: none;
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 36px;
   cursor: pointer;
   color: #1e3a5f;
+  line-height: 1;
+  padding: 0;
 }
 
 .mobile-menu {
@@ -108,14 +109,13 @@
   color: white;
 }
 
-/* HERO */
 .hero {
   padding: 100px 60px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.hero-content { max-width: 640px; }
+.hero-content { max-width: 640px; margin: 0 auto; text-align: center; }
 
 .hero-badge {
   display: inline-block;
@@ -142,10 +142,15 @@
   color: #666;
   line-height: 1.6;
   margin-bottom: 40px;
-  max-width: 520px;
 }
 
-.hero-buttons { display: flex; gap: 16px; margin-bottom: 60px; flex-wrap: wrap; }
+.hero-buttons {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 60px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 
 .hero-cta {
   padding: 16px 32px;
@@ -176,8 +181,15 @@
 
 .hero-stats {
   display: flex;
-  gap: 48px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+}
+
+.hero-stat {
+  width: 100%;
+  text-align: center;
 }
 
 .hero-stat h3 {
@@ -189,12 +201,11 @@
 
 .hero-stat p { font-size: 14px; color: #888; }
 
-/* SECTIONS */
-.section { padding: 100px 60px; }
+.section { padding: 80px 60px; }
 .section.alt { background: #f9fafb; }
 
 .section-inner {
-  max-width: 1100px;
+  max-width: 700px;
   margin: 0 auto;
 }
 
@@ -218,18 +229,27 @@
   line-height: 1.2;
 }
 
+.section p {
+  font-size: 16px;
+  color: #666;
+  line-height: 1.7;
+  margin-bottom: 24px;
+}
+
 .section-sub {
   font-size: 18px;
   color: #666;
   margin-bottom: 48px;
 }
 
-/* STEPS */
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 32px;
   margin-top: 48px;
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .step-card {
@@ -255,24 +275,6 @@
 
 .step-card p { font-size: 15px; color: #666; line-height: 1.6; }
 
-/* SPLIT */
-.split {
-  display: flex;
-  align-items: center;
-  gap: 80px;
-}
-
-.split.reverse { flex-direction: row-reverse; }
-.split-text { flex: 1; }
-.split-visual { flex: 1; display: flex; justify-content: center; }
-
-.split-text p {
-  font-size: 16px;
-  color: #666;
-  line-height: 1.7;
-  margin-bottom: 24px;
-}
-
 .feature-list {
   list-style: none;
   padding: 0;
@@ -282,9 +284,12 @@
 .feature-list li {
   font-size: 15px;
   color: #444;
-  padding: 6px 0;
+  padding: 8px 0;
   line-height: 1.5;
+  border-bottom: 1px solid #f0f0f0;
 }
+
+.feature-list li:last-child { border-bottom: none; }
 
 .section-cta {
   padding: 14px 28px;
@@ -302,102 +307,6 @@
 .purple-cta { background: #6a0dad; }
 .purple-cta:hover { background: #5a0b9d; }
 
-/* VISUAL CARDS */
-.visual-card {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-  width: 100%;
-  max-width: 300px;
-}
-
-.visual-card.purple { border-top: 4px solid #6a0dad; }
-
-.visual-label {
-  font-size: 12px;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 10px;
-}
-
-.visual-card h4 {
-  font-size: 16px;
-  color: #1e3a5f;
-  margin-bottom: 10px;
-}
-
-.visual-card p {
-  font-size: 14px;
-  color: #555;
-  margin-bottom: 6px;
-}
-
-.visual-pay {
-  font-size: 24px;
-  font-weight: 700;
-  color: #2e7d32;
-  margin: 12px 0 !important;
-}
-
-.visual-btn {
-  background: #1e3a5f;
-  color: white;
-  padding: 10px;
-  border-radius: 8px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 12px;
-}
-
-.purple-btn { background: #6a0dad; }
-
-/* PRICING */
-.pricing-card {
-  background: white;
-  border-radius: 20px;
-  padding: 48px;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.08);
-  max-width: 500px;
-  margin: 0 auto;
-  text-align: left;
-}
-
-.pricing-card h3 {
-  font-size: 32px;
-  color: #1e3a5f;
-  margin-bottom: 12px;
-}
-
-.pricing-card > p {
-  font-size: 15px;
-  color: #666;
-  line-height: 1.6;
-  margin-bottom: 24px;
-}
-
-.pricing-example {
-  background: #f9fafb;
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.pricing-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 0;
-  font-size: 15px;
-  color: #444;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.pricing-row:last-child { border-bottom: none; }
-.pricing-row .green { color: #2e7d32; font-weight: 700; }
-.pricing-row .blue { color: #1565c0; font-weight: 700; }
-
-/* CTA BANNER */
 .cta-banner {
   background: #1e3a5f;
   padding: 80px 60px;
@@ -423,7 +332,6 @@
 
 .cta-banner .hero-cta:hover { background: #f0f4f8; }
 
-/* FOOTER */
 .landing-footer {
   background: #0f1f33;
   padding: 60px;
@@ -484,7 +392,6 @@
 
 .footer-bottom p { color: #666; font-size: 13px; }
 
-/* RESPONSIVE */
 @media (max-width: 768px) {
   .landing-nav { padding: 16px 20px; }
   .nav-links { display: none; }
@@ -495,11 +402,6 @@
   .section { padding: 60px 20px; }
   .section h2 { font-size: 32px; }
   .steps-grid { grid-template-columns: 1fr; }
-  .split { flex-direction: column !important; gap: 40px; }
-  .split.reverse { flex-direction: column !important; }
-  .split-visual { width: 100%; }
-  .visual-card { max-width: 100%; }
-  .pricing-card { padding: 28px; }
   .cta-banner { padding: 60px 20px; }
   .cta-banner h2 { font-size: 28px; }
   .landing-footer { padding: 40px 20px; }

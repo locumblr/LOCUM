@@ -14,10 +14,9 @@ function DoctorDashboard() {
   const [accepting, setAccepting] = useState(null);
   const [searchDate, setSearchDate] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
 
-  useEffect(() => {
-    fetchDoctorData();
-  }, []);
+  useEffect(() => { fetchDoctorData(); }, []);
 
   const fetchDoctorData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -49,7 +48,7 @@ function DoctorDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from('push_subscriptions').upsert({
         doctor_id: user.id,
-        qualification: qualification,
+        qualification,
         subscription: JSON.stringify(subscription),
       }, { onConflict: 'doctor_id' });
     } catch (err) {
@@ -84,28 +83,20 @@ function DoctorDashboard() {
   };
 
   const bookDuty = async (duty) => {
-    const confirmed = window.confirm(
-      `Confirm booking at ${duty.hospitals?.hospital_name} on ${duty.date}?\n\nNote: Once booked, this cannot be cancelled.`
-    );
+    const confirmed = window.confirm(`Confirm booking at ${duty.hospitals?.hospital_name} on ${duty.date}?\n\nNote: Once booked, this cannot be cancelled.`);
     if (!confirmed) return;
     setBooking(duty.id);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: latest } = await supabase
-      .from("locum_duties")
-      .select("booked, booking_status")
-      .eq("id", duty.id)
-      .single();
+    const { data: latest } = await supabase.from("locum_duties").select("booked, booking_status").eq("id", duty.id).single();
     if (latest?.booked || latest?.booking_status !== "open") {
       alert("Sorry, this duty was just booked by someone else!");
       setBooking(null);
       fetchDuties(doctorQualification);
       return;
     }
-    const { error } = await supabase
-      .from("locum_duties")
+    const { error } = await supabase.from("locum_duties")
       .update({ booked: true, booked_by: user.id, booking_status: "pending_verification" })
-      .eq("id", duty.id)
-      .eq("booked", false);
+      .eq("id", duty.id).eq("booked", false);
     if (error) {
       alert("Error booking duty: " + error.message);
     } else {
@@ -116,37 +107,22 @@ function DoctorDashboard() {
   };
 
   const acceptCover = async (coverRequest) => {
-    const confirmed = window.confirm(
-      `Accept cover for duty at ${coverRequest.locum_duties?.hospitals?.hospital_name} on ${coverRequest.locum_duties?.date}?\n\nYou will take over this duty from Dr. ${coverRequest.doctors?.first_name} ${coverRequest.doctors?.last_name}.`
-    );
+    const confirmed = window.confirm(`Accept cover for duty at ${coverRequest.locum_duties?.hospitals?.hospital_name} on ${coverRequest.locum_duties?.date}?`);
     if (!confirmed) return;
     setAccepting(coverRequest.id);
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: coveringDoctor } = await supabase
-      .from("doctors")
-      .select("first_name, last_name")
-      .eq("id", user.id)
-      .single();
-    await supabase.from("cover_requests").update({
-      status: "accepted",
-      covering_doctor_id: user.id,
-    }).eq("id", coverRequest.id);
+    const { data: coveringDoctor } = await supabase.from("doctors").select("first_name, last_name").eq("id", user.id).single();
+    await supabase.from("cover_requests").update({ status: "accepted", covering_doctor_id: user.id }).eq("id", coverRequest.id);
     const { error } = await supabase.from("locum_duties").update({
-      booked_by: user.id,
-      booked: true,
-      booking_status: "reopened",
+      booked_by: user.id, booked: true, booking_status: "reopened",
     }).eq("id", coverRequest.duty_id);
-    if (error) {
-      alert("Error accepting cover: " + error.message);
-      setAccepting(null);
-      return;
-    }
+    if (error) { alert("Error accepting cover: " + error.message); setAccepting(null); return; }
     await supabase.from("notifications").insert({
       user_id: coverRequest.locum_duties?.hospital_id,
       title: "🔄 Booking Re-opened — Re-verification Required",
-      message: `Dr. ${coverRequest.doctors?.first_name} ${coverRequest.doctors?.last_name} has requested cover for the ${coverRequest.locum_duties?.qualification} duty on ${coverRequest.locum_duties?.date}. Dr. ${coveringDoctor?.first_name} ${coveringDoctor?.last_name} has agreed to cover and requires your verification.`,
+      message: `Dr. ${coverRequest.doctors?.first_name} ${coverRequest.doctors?.last_name} requested cover. Dr. ${coveringDoctor?.first_name} ${coveringDoctor?.last_name} has agreed to cover and requires your verification.`,
     });
-    alert("You have accepted the cover! The hospital has been notified and will need to re-verify your credentials.");
+    alert("Cover accepted! Hospital has been notified.");
     fetchDuties(doctorQualification);
     fetchCoverRequests(doctorQualification, user.id);
     setAccepting(null);
@@ -176,39 +152,38 @@ function DoctorDashboard() {
         <div className="header-buttons">
           <button onClick={() => navigate("/doctor/locums")}>My Locums</button>
           <button onClick={() => navigate("/doctor/profile")}>Profile</button>
-          <button onClick={() => navigate("/help")}>Help</button>
-          <button className="logout" onClick={logout}>Logout</button>
+          <div style={{ position: "relative" }}>
+            <button className="menu-btn" onClick={() => setShowMenu(!showMenu)}>⋮</button>
+            {showMenu && (
+              <div className="dropdown-menu">
+                <button onClick={() => { navigate("/help"); setShowMenu(false); }}>❓ Help</button>
+                <button className="logout-item" onClick={logout}>🚪 Logout</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {coverRequests.length > 0 && (
         <div className="cover-requests-section">
           <h2>🔄 Cover Requests</h2>
-          <p className="subtitle">A colleague needs cover for these duties — can you help?</p>
+          <p className="subtitle">A colleague needs cover — can you help?</p>
           <div className="duties-grid">
             {coverRequests.map((cr) => (
               <div key={cr.id} className="duty-card cover-request-card">
                 <div className="cover-badge">Cover Needed</div>
                 <div className="duty-header">
                   <h3>{cr.locum_duties?.hospitals?.hospital_name}</h3>
-                  <span className="pay">₹{(cr.locum_duties?.doctor_pay || Math.round((cr.locum_duties?.pay || 0) * 0.8)).toLocaleString()}</span>
+                  <span className="pay">Rs.{(cr.locum_duties?.doctor_pay || Math.round((cr.locum_duties?.pay || 0) * 0.8)).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
-  <p>📍 {duty.hospitals?.address || "Address not provided"}</p>
-  <p>📅 {duty.date}</p>
-  <p>🕐 {duty.start_time} - {duty.end_time}</p>
-  <p>🎓 {duty.qualifications && duty.qualifications.length > 1
-    ? duty.qualifications.join(", ")
-    : duty.qualification}
-  </p>
-  {duty.notes && <p>📝 {duty.notes}</p>}
-</div>
-                <button
-                  className="book-btn"
-                  style={{ background: "#27ae60" }}
-                  onClick={() => acceptCover(cr)}
-                  disabled={accepting === cr.id}
-                >
+                  <p>📍 {cr.locum_duties?.hospitals?.address || "—"}</p>
+                  <p>📅 {cr.locum_duties?.date}</p>
+                  <p>🕐 {cr.locum_duties?.start_time} - {cr.locum_duties?.end_time}</p>
+                  <p>🎓 {cr.locum_duties?.qualification}</p>
+                  <p style={{ fontSize: 13, color: "#888" }}>Requested by Dr. {cr.doctors?.first_name} {cr.doctors?.last_name}</p>
+                </div>
+                <button className="book-btn" style={{ background: "#27ae60" }} onClick={() => acceptCover(cr)} disabled={accepting === cr.id}>
                   {accepting === cr.id ? "Accepting..." : "✅ Accept Cover"}
                 </button>
               </div>
@@ -218,27 +193,34 @@ function DoctorDashboard() {
       )}
 
       <h2>Available Locum Duties</h2>
-      <p className="subtitle">
-        {doctorQualification ? `Showing duties matching: ${doctorQualification}` : "Loading..."}
-      </p>
+      {doctorQualification && (
+        <p className="subtitle">Showing duties for: <strong>{doctorQualification}</strong></p>
+      )}
 
-      <div className="search-bar">
-        <input
-          type="date"
-          className="search-input"
-          value={searchDate}
-          onChange={(e) => setSearchDate(e.target.value)}
-        />
-        <input
-          type="text"
-          className="search-input"
-          value={searchLocation}
-          onChange={(e) => setSearchLocation(e.target.value)}
-          placeholder="🔍 Search by hospital or location..."
-        />
+      {/* Filter Bar */}
+      <div className="filter-bar">
+        <div className="filter-group">
+          <label className="filter-label">📅 Filter by Date</label>
+          <input
+            type="date"
+            className="search-input"
+            value={searchDate}
+            onChange={(e) => setSearchDate(e.target.value)}
+          />
+        </div>
+        <div className="filter-group">
+          <label className="filter-label">📍 Filter by Hospital / Location</label>
+          <input
+            type="text"
+            className="search-input"
+            value={searchLocation}
+            onChange={(e) => setSearchLocation(e.target.value)}
+            placeholder="Type hospital name or area..."
+          />
+        </div>
         {(searchDate || searchLocation) && (
           <button className="clear-btn" onClick={() => { setSearchDate(""); setSearchLocation(""); }}>
-            ✕ Clear
+            ✕ Clear Filters
           </button>
         )}
       </div>
@@ -248,14 +230,14 @@ function DoctorDashboard() {
       ) : duties.length === 0 ? (
         <p style={{ color: "#888" }}>No available duties matching your qualification at the moment.</p>
       ) : filteredDuties.length === 0 ? (
-        <p style={{ color: "#888" }}>No duties match your search. <span style={{ color: "#1e3a5f", cursor: "pointer" }} onClick={() => { setSearchDate(""); setSearchLocation(""); }}>Clear filters</span></p>
+        <p style={{ color: "#888" }}>No duties match your filters. <span style={{ color: "#1e3a5f", cursor: "pointer" }} onClick={() => { setSearchDate(""); setSearchLocation(""); }}>Clear filters</span></p>
       ) : (
         <div className="duties-grid">
           {filteredDuties.map((duty) => (
             <div key={duty.id} className="duty-card">
               <div className="duty-header">
                 <h3>{duty.hospitals?.hospital_name || "Hospital"}</h3>
-                <span className="pay">₹{(duty.doctor_pay || Math.round(duty.pay * 0.8)).toLocaleString()}</span>
+                <span className="pay">Rs.{(duty.doctor_pay || Math.round(duty.pay * 0.8)).toLocaleString()}</span>
               </div>
               <div className="duty-details">
                 <p>📍 {duty.hospitals?.address || "Address not provided"}</p>
@@ -264,11 +246,7 @@ function DoctorDashboard() {
                 <p>🎓 {duty.qualification}</p>
                 {duty.notes && <p>📝 {duty.notes}</p>}
               </div>
-              <button
-                className="book-btn"
-                onClick={() => bookDuty(duty)}
-                disabled={booking === duty.id}
-              >
+              <button className="book-btn" onClick={() => bookDuty(duty)} disabled={booking === duty.id}>
                 {booking === duty.id ? "Booking..." : "Book Duty"}
               </button>
             </div>
