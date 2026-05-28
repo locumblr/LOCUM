@@ -144,7 +144,7 @@ function Login() {
     e.preventDefault();
     if (!forgotEmail) return;
     const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: "https://project-1qlxe.vercel.app/reset-password",
+      redirectTo: "https://bookmylocum.com/reset-password",
     });
     if (error) {
       setError(error.message);
