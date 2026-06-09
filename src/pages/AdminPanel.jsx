@@ -810,6 +810,7 @@ function AdminPanel() {
         target="_blank"
         rel="noopener noreferrer"
         style={{ fontSize: 12, background: "#e3f2fd", color: "#1565c0", padding: "3px 10px", borderRadius: 6, textDecoration: "none" }}
+      >
         🔍 Verify on NMC
       </a>
     </p>
