@@ -804,13 +804,12 @@ function AdminPanel() {
   <div>
     <label>NMC Registration No.</label>
     <p style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      {selected.nmc_registration_number}
+    {selected.nmc_registration_number}
       
-        href={`https://www.nmc.org.in/information-desk/indian-medical-register/`}
+        href="https://www.nmc.org.in/information-desk/indian-medical-register/"
         target="_blank"
         rel="noopener noreferrer"
         style={{ fontSize: 12, background: "#e3f2fd", color: "#1565c0", padding: "3px 10px", borderRadius: 6, textDecoration: "none" }}
-      >
         🔍 Verify on NMC
       </a>
     </p>
