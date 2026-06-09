@@ -353,6 +353,27 @@ function AdminPanel() {
   const updateStatus = async (table, id, status) => {
     const { error } = await supabase.from(table).update({ status }).eq("id", id);
     if (error) { alert("Error: " + error.message); return; }
+    if ((table === "doctors" || table === "nurses") && status === "active") {
+      const professional = table === "doctors"
+        ? doctors.find(d => d.id === id)
+        : nurses.find(n => n.id === id);
+      if (professional) {
+        await supabase.functions.invoke("send-email", {
+          body: {
+            to: professional.email,
+            subject: "Your LOCUM Account Has Been Approved!",
+            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+              <h1 style="color: #1e3a5f;">LOCUM</h1>
+              <h2>Congratulations, ${table === "doctors" ? "Dr. " : ""}${professional.first_name} ${professional.last_name}!</h2>
+              <p>Your ${table === "doctors" ? "doctor" : "nurse"} account has been verified and approved. You can now log in and start booking locum duties.</p>
+              <a href="https://bookmylocum.com/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a>
+              <p style="margin-top: 24px; color: #888; font-size: 13px;">If you have any questions, contact us at locum.blr@gmail.com</p>
+            </div>`,
+          },
+        });
+      }
+    }
+
     if (table === "hospitals" && status === "active") {
       const hospital = hospitals.find(h => h.id === id);
       if (hospital) {
@@ -431,6 +452,7 @@ function AdminPanel() {
 
       <div className="stats-row">
         <div className="stat-card"><h3>{doctors.filter(d => d.status === "active").length}</h3><p>Active Doctors</p></div>
+        <div className="stat-card orange"><h3>{doctors.filter(d => d.status === "pending").length + nurses.filter(n => n.status === "pending").length}</h3><p>Pending Approvals</p></div>
         <div className="stat-card" style={{ borderTop: "3px solid #6a0dad" }}><h3 style={{ color: "#6a0dad" }}>{nurses.filter(n => n.status === "active").length}</h3><p>Active Nurses</p></div>
         <div className="stat-card green"><h3>{hospitals.filter(h => h.status === "active").length}</h3><p>Active Hospitals</p></div>
         <div className="stat-card orange"><h3>{pendingHospitals.length}</h3><p>Pending Hospitals</p></div>
@@ -472,12 +494,16 @@ function AdminPanel() {
                     <td>{doc.qualification}</td>
                     <td>{doc.experience} yrs</td>
                     <td><span className={`status-pill ${doc.status}`}>{doc.status}</span></td>
-                    <td>
-                      <button className="view-btn" onClick={() => setSelected({ ...doc, type: "doctor" })}>View</button>
-                      {doc.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("doctors", doc.id, "frozen")}>Freeze</button>}
-                      {doc.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Unfreeze</button>}
-                      <button className="delete-btn" onClick={() => deleteAccount("doctors", doc.id)}>Delete</button>
-                    </td>
+<td>
+  <button className="view-btn" onClick={() => setSelected({ ...doc, type: "doctor" })}>View</button>
+  {doc.status === "pending" && <>
+    <button className="approve-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Approve</button>
+    <button className="reject-btn" onClick={() => updateStatus("doctors", doc.id, "rejected")}>Reject</button>
+  </>}
+  {doc.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("doctors", doc.id, "frozen")}>Freeze</button>}
+  {doc.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Unfreeze</button>}
+  <button className="delete-btn" onClick={() => deleteAccount("doctors", doc.id)}>Delete</button>
+</td>
                   </tr>
                 ))}
               </tbody>
@@ -502,8 +528,12 @@ function AdminPanel() {
                     <td><span className={`status-pill ${nur.status}`}>{nur.status}</span></td>
                     <td>
                       <button className="view-btn" onClick={() => setSelected({ ...nur, type: "nurse" })}>View</button>
-                      {nur.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("nurses", nur.id, "frozen")}>Freeze</button>}
-                      {nur.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Unfreeze</button>}
+                      {nur.status === "pending" && <>
+  <button className="approve-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Approve</button>
+  <button className="reject-btn" onClick={() => updateStatus("nurses", nur.id, "rejected")}>Reject</button>
+</>}
+{nur.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("nurses", nur.id, "frozen")}>Freeze</button>}
+{nur.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Unfreeze</button>}
                       <button className="delete-btn" onClick={() => deleteAccount("nurses", nur.id)}>Delete</button>
                     </td>
                   </tr>
@@ -769,7 +799,32 @@ function AdminPanel() {
                 <div><label>Email</label><p>{selected.email}</p></div>
                 <div><label>Phone</label><p>{selected.phone}</p></div>
                 <div><label>Qualification</label><p>{selected.qualification}</p></div>
-                <div><label>Experience</label><p>{selected.experience} years</p></div>
+<div><label>Experience</label><p>{selected.experience} years</p></div>
+{selected.nmc_registration_number && (
+  <div>
+    <label>NMC Registration No.</label>
+    <p style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      {selected.nmc_registration_number}
+      
+        href={`https://www.nmc.org.in/information-desk/indian-medical-register/`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ fontSize: 12, background: "#e3f2fd", color: "#1565c0", padding: "3px 10px", borderRadius: 6, textDecoration: "none" }}
+      >
+        🔍 Verify on NMC
+      </a>
+    </p>
+  </div>
+)}
+{selected.state_medical_council && (
+  <div><label>State Medical Council</label><p>{selected.state_medical_council}</p></div>
+)}
+{selected.registration_number && (
+  <div><label>Nursing Council Reg. No.</label><p>{selected.registration_number}</p></div>
+)}
+{selected.state_nursing_council && (
+  <div><label>State Nursing Council</label><p>{selected.state_nursing_council}</p></div>
+)}
                 <div><label>Status</label><p>{selected.status}</p></div>
                 <div><label>Type</label><p style={{ textTransform: "capitalize" }}>{selected.type}</p></div>
                 {selected.flagged && <>

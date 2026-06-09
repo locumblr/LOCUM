@@ -4,55 +4,92 @@ import { supabase } from "../supabaseClient";
 import "./Register.css";
 import logo from "../assets/logo.png";
 
-const qualifications = [
+const doctorQualifications = [
   "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
-  "MD - General Medicine",
-  "MD - Paediatrics",
-  "MD - Psychiatry",
-  "MD - Dermatology",
-  "MD - Anaesthesiology",
-  "MD - Radiology",
-  "MD - Radiology with PCPNDT Certification",
-  "MD - Pathology",
-  "MD - Microbiology",
-  "MD - Biochemistry",
-  "MD - Community Medicine",
-  "MS - General Surgery",
-  "MS - Orthopaedics",
-  "MS - Ophthalmology",
-  "MS - ENT (Otorhinolaryngology)",
-  "MS - Obstetrics & Gynaecology",
-  "MCh - Neurosurgery",
-  "MCh - Cardiothoracic Surgery",
-  "MCh - Plastic Surgery",
-  "MCh - Urology",
-  "DM - Cardiology",
-  "DM - Neurology",
-  "DM - Nephrology",
-  "DM - Gastroenterology",
-  "DM - Endocrinology",
-  "DM - Oncology",
-  "DNB - General Medicine",
-  "DNB - General Surgery",
-  "DNB - Paediatrics",
-  "DNB - Obstetrics & Gynaecology",
-  "DNB - Orthopaedics",
-  "DNB - Anaesthesiology",
-  "BDS / MDS (Dentistry)",
-  "B.Pharm / M.Pharm (Pharmacy)",
-  "B.Sc Nursing / M.Sc Nursing",
-  "Diploma in Anaesthesiology (DA)",
-  "Diploma in Child Health (DCH)",
-  "Diploma in Obstetrics & Gynaecology (DGO)",
-  "Diploma in Orthopaedics (D.Ortho)",
-  "Diploma in Ophthalmology (DO)",
-  "Diploma in ENT",
-  "Diploma in Radiology (DMRD)",
+  "MD - General Medicine", "MD - Paediatrics", "MD - Psychiatry",
+  "MD - Dermatology", "MD - Anaesthesiology", "MD - Radiology",
+  "MD - Radiology with PCPNDT Certification", "MD - Pathology",
+  "MD - Microbiology", "MD - Biochemistry", "MD - Community Medicine",
+  "MS - General Surgery", "MS - Orthopaedics", "MS - Ophthalmology",
+  "MS - ENT (Otorhinolaryngology)", "MS - Obstetrics & Gynaecology",
+  "MCh - Neurosurgery", "MCh - Cardiothoracic Surgery", "MCh - Plastic Surgery",
+  "MCh - Urology", "DM - Cardiology", "DM - Neurology", "DM - Nephrology",
+  "DM - Gastroenterology", "DM - Endocrinology", "DM - Oncology",
+  "DNB - General Medicine", "DNB - General Surgery", "DNB - Paediatrics",
+  "DNB - Obstetrics & Gynaecology", "DNB - Orthopaedics", "DNB - Anaesthesiology",
+  "BDS / MDS (Dentistry)", "B.Pharm / M.Pharm (Pharmacy)",
+  "Diploma in Anaesthesiology (DA)", "Diploma in Child Health (DCH)",
+  "Diploma in Obstetrics & Gynaecology (DGO)", "Diploma in Orthopaedics (D.Ortho)",
+  "Diploma in Ophthalmology (DO)", "Diploma in ENT", "Diploma in Radiology (DMRD)",
   "Diploma in Radiology (DMRD) with PCPNDT Certification",
-  "PCPNDT Certified Sonologist",
-  "Fellowship in Emergency Medicine (FCEM)",
-  "Other",
+  "PCPNDT Certified Sonologist", "Fellowship in Emergency Medicine (FCEM)", "Other",
 ];
+
+const nursingQualifications = [
+  "GNM (General Nursing & Midwifery)", "B.Sc Nursing", "Post Basic B.Sc Nursing",
+  "M.Sc Nursing", "Critical Care Nursing", "Operation Theatre Nursing",
+  "Emergency & Trauma Nursing", "Paediatric Nursing", "Oncology Nursing",
+  "Dialysis Nursing", "ICU Nursing", "NICU Nursing", "PICU Nursing",
+  "Midwifery", "Community Health Nursing", "Psychiatric Nursing", "Other",
+];
+
+const stateMedicalCouncils = [
+  "Andhra Pradesh Medical Council",
+  "Arunachal Pradesh Medical Council",
+  "Assam Medical Council",
+  "Bihar Medical Council",
+  "Chhattisgarh Medical Council",
+  "Delhi Medical Council",
+  "Goa Medical Council",
+  "Gujarat Medical Council",
+  "Haryana Medical Council",
+  "Himachal Pradesh Medical Council",
+  "Jammu & Kashmir Medical Council",
+  "Jharkhand Medical Council",
+  "Karnataka Medical Council",
+  "Kerala Medical Council",
+  "Madhya Pradesh Medical Council",
+  "Maharashtra Medical Council",
+  "Manipur Medical Council",
+  "Meghalaya Medical Council",
+  "Mizoram Medical Council",
+  "Nagaland Medical Council",
+  "Odisha Medical Council",
+  "Punjab Medical Council",
+  "Rajasthan Medical Council",
+  "Sikkim Medical Council",
+  "Tamil Nadu Medical Council",
+  "Telangana State Medical Council",
+  "Tripura Medical Council",
+  "Uttar Pradesh Medical Council",
+  "Uttarakhand Medical Council",
+  "West Bengal Medical Council",
+  "National Medical Commission (NMC)",
+];
+
+const stateNursingCouncils = [
+  "Andhra Pradesh Nurses and Midwives Council",
+  "Assam Nurses, Midwives and Health Visitors Council",
+  "Bihar Nurses Registration Council",
+  "Delhi Nursing Council",
+  "Goa Nursing Council",
+  "Gujarat Nursing Council",
+  "Haryana Nursing Council",
+  "Himachal Pradesh Nursing Council",
+  "Karnataka Nursing Council",
+  "Kerala Nurses and Midwives Council",
+  "Madhya Pradesh Nurses Registration Council",
+  "Maharashtra Nursing Council",
+  "Odisha Nursing Council",
+  "Punjab Nurses Registration Council",
+  "Rajasthan Nursing Council",
+  "Tamil Nadu Nurses and Midwives Council",
+  "Telangana Nursing Council",
+  "Uttar Pradesh Nurses and Midwives Council",
+  "West Bengal Nursing Council",
+  "Indian Nursing Council (INC)",
+];
+
 function TermsBox({ agreed, setAgreed }) {
   return (
     <div
@@ -85,19 +122,16 @@ function Register() {
     <div className="register-container">
       <img src={logo} alt="LOCUM" className="register-logo" />
       <h1>Create Account</h1>
-      <p>Register as a Doctor or Hospital</p>
+      <p>Register as a Doctor, Nurse or Hospital</p>
       {!role && (
-  <div className="role-select">
-    <button onClick={() => setRole("doctor")}>I am a Doctor</button>
-    <button onClick={() => setRole("nurse")}>I am a Nurse</button>
-    <button onClick={() => setRole("hospital")}>I am a Hospital</button>
-  </div>
-)}
-
-{role === "doctor" && <DoctorForm navigate={navigate} />}
-{role === "nurse" && <NurseForm navigate={navigate} />}
-{role === "hospital" && <HospitalForm navigate={navigate} />}
+        <div className="role-select">
+          <button onClick={() => setRole("doctor")}>I am a Doctor</button>
+          <button onClick={() => setRole("nurse")}>I am a Nurse</button>
+          <button onClick={() => setRole("hospital")}>I am a Hospital</button>
+        </div>
+      )}
       {role === "doctor" && <DoctorForm navigate={navigate} />}
+      {role === "nurse" && <NurseForm navigate={navigate} />}
       {role === "hospital" && <HospitalForm navigate={navigate} />}
       {role && (
         <p className="back-link" onClick={() => setRole(null)}>← Go back</p>
@@ -114,6 +148,7 @@ function DoctorForm({ navigate }) {
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     qualification: "", experience: "",
+    nmcRegistrationNumber: "", stateMedicalCouncil: "",
     password: "", confirmPassword: "",
   });
   const [certificate, setCertificate] = useState(null);
@@ -149,11 +184,14 @@ function DoctorForm({ navigate }) {
         phone: form.phone,
         qualification: form.qualification,
         experience: parseInt(form.experience),
+        nmc_registration_number: form.nmcRegistrationNumber,
+        state_medical_council: form.stateMedicalCouncil,
         document_url: fileName,
-        status: "active",
+        status: "pending",
       });
       if (dbError) throw dbError;
-      alert("Registration successful! You can now log in to your account.");
+      await supabase.auth.signOut();
+      alert("Application submitted! Our team will verify your registration and notify you once approved. This usually takes 24 hours.");
       navigate("/login");
     } catch (err) {
       setError(err.message);
@@ -165,27 +203,186 @@ function DoctorForm({ navigate }) {
   return (
     <form onSubmit={submit} className="register-form">
       <h2>Doctor Registration</h2>
+
+      <div style={{ background: "#e3f2fd", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#1565c0", lineHeight: 1.6 }}>
+        ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
+      </div>
+
       {error && <p className="error-msg">{error}</p>}
+
       <div className="form-row">
         <input name="firstName" placeholder="First Name" required onChange={handle} />
         <input name="lastName" placeholder="Last Name" required onChange={handle} />
       </div>
       <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
       <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
+
       <select name="qualification" required onChange={handle} defaultValue="">
-        <option value="" disabled>Select Your Qualification</option>
-        {qualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
+        <option value="" disabled>Select Your Primary Qualification</option>
+        {doctorQualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
       </select>
-      <input name="experience" placeholder="Years of Experience" type="number" required onChange={handle} />
+
+      <input name="experience" placeholder="Years of Experience" type="number" min="0" required onChange={handle} />
+
+      <div style={{ background: "#f9fafb", borderRadius: 10, padding: "14px 16px", marginBottom: 4, border: "1px solid #e0e0e0" }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          Medical Registration Details
+        </p>
+        <input
+          name="nmcRegistrationNumber"
+          placeholder="NMC / State Medical Council Registration Number"
+          required
+          onChange={handle}
+          style={{ width: "100%", padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, marginBottom: 10, boxSizing: "border-box" }}
+        />
+        <select
+          name="stateMedicalCouncil"
+          required
+          onChange={handle}
+          defaultValue=""
+          style={{ width: "100%", padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "white" }}
+        >
+          <option value="" disabled>Select State Medical Council</option>
+          {stateMedicalCouncils.map((c) => (<option key={c} value={c}>{c}</option>))}
+        </select>
+        <p style={{ fontSize: 12, color: "#888", marginTop: 8, marginBottom: 0 }}>
+          Your registration number will be verified against the NMC registry before activation.
+        </p>
+      </div>
+
       <label className="file-label">
-        Upload Certificate / Proof of Qualification
+        Upload Primary Certificate / Proof of Qualification
         <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
       </label>
+      {certificate && <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {certificate.name}</p>}
+
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
       <TermsBox agreed={agreed} setAgreed={setAgreed} />
       <button type="submit" disabled={loading || !agreed}>
-        {loading ? "Submitting..." : "Create Account"}
+        {loading ? "Submitting..." : "Submit Application"}
+      </button>
+    </form>
+  );
+}
+
+function NurseForm({ navigate }) {
+  const [form, setForm] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    qualification: "", experience: "",
+    registrationNumber: "", stateNursingCouncil: "",
+    password: "", confirmPassword: "",
+  });
+  const [certificate, setCertificate] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [agreed, setAgreed] = useState(false);
+
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!agreed) { setError("You must agree to the Terms of Service and Privacy Policy to continue."); return; }
+    if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
+    if (!certificate) { setError("Please upload your certificate."); return; }
+    setLoading(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: { data: { role: "nurse" } }
+      });
+      if (authError) throw authError;
+      const fileExt = certificate.name.split('.').pop();
+      const fileName = `nurses/${authData.user.id}/certificate.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, certificate);
+      if (uploadError) throw uploadError;
+      const { error: dbError } = await supabase.from("nurses").insert({
+        id: authData.user.id,
+        first_name: form.firstName,
+        last_name: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        qualification: form.qualification,
+        experience: parseInt(form.experience),
+        registration_number: form.registrationNumber,
+        state_nursing_council: form.stateNursingCouncil,
+        document_url: fileName,
+        status: "pending",
+      });
+      if (dbError) throw dbError;
+      await supabase.auth.signOut();
+      alert("Application submitted! Our team will verify your registration and notify you once approved. This usually takes 24 hours.");
+      navigate("/login");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="register-form">
+      <h2>Nurse Registration</h2>
+
+      <div style={{ background: "#f3e5f5", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#6a0dad", lineHeight: 1.6 }}>
+        ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
+      </div>
+
+      {error && <p className="error-msg">{error}</p>}
+
+      <div className="form-row">
+        <input name="firstName" placeholder="First Name" required onChange={handle} />
+        <input name="lastName" placeholder="Last Name" required onChange={handle} />
+      </div>
+      <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
+      <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
+
+      <select name="qualification" required onChange={handle} defaultValue="">
+        <option value="" disabled>Select Your Primary Qualification</option>
+        {nursingQualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
+      </select>
+
+      <input name="experience" placeholder="Years of Experience" type="number" min="0" required onChange={handle} />
+
+      <div style={{ background: "#f9fafb", borderRadius: 10, padding: "14px 16px", marginBottom: 4, border: "1px solid #e0e0e0" }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          Nursing Council Registration Details
+        </p>
+        <input
+          name="registrationNumber"
+          placeholder="Nursing Council Registration Number"
+          required
+          onChange={handle}
+          style={{ width: "100%", padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, marginBottom: 10, boxSizing: "border-box" }}
+        />
+        <select
+          name="stateNursingCouncil"
+          required
+          onChange={handle}
+          defaultValue=""
+          style={{ width: "100%", padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "white" }}
+        >
+          <option value="" disabled>Select State Nursing Council</option>
+          {stateNursingCouncils.map((c) => (<option key={c} value={c}>{c}</option>))}
+        </select>
+        <p style={{ fontSize: 12, color: "#888", marginTop: 8, marginBottom: 0 }}>
+          Your registration number will be verified before activation.
+        </p>
+      </div>
+
+      <label className="file-label">
+        Upload Primary Certificate / Proof of Qualification
+        <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
+      </label>
+      {certificate && <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {certificate.name}</p>}
+
+      <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
+      <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
+      <TermsBox agreed={agreed} setAgreed={setAgreed} />
+      <button type="submit" disabled={loading || !agreed}>
+        {loading ? "Submitting..." : "Submit Application"}
       </button>
     </form>
   );
@@ -266,104 +463,5 @@ function HospitalForm({ navigate }) {
     </form>
   );
 }
-function NurseForm({ navigate }) {
-  const [form, setForm] = useState({
-    firstName: "", lastName: "", email: "", phone: "",
-    qualification: "", experience: "",
-    password: "", confirmPassword: "",
-  });
-  const [certificate, setCertificate] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [agreed, setAgreed] = useState(false);
 
-  const nursingQualifications = [
-    "GNM (General Nursing & Midwifery)",
-    "B.Sc Nursing",
-    "Post Basic B.Sc Nursing",
-    "M.Sc Nursing",
-    "Critical Care Nursing",
-    "Operation Theatre Nursing",
-    "Emergency & Trauma Nursing",
-    "Paediatric Nursing",
-    "Oncology Nursing",
-    "Dialysis Nursing",
-    "ICU Nursing",
-    "NICU Nursing",
-    "PICU Nursing",
-    "Midwifery",
-    "Community Health Nursing",
-    "Psychiatric Nursing",
-    "Other",
-  ];
-
-  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (!agreed) { setError("You must agree to the Terms of Service and Privacy Policy to continue."); return; }
-    if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
-    if (!certificate) { setError("Please upload your certificate."); return; }
-    setLoading(true);
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: { data: { role: "nurse" } }
-      });
-      if (authError) throw authError;
-      const fileExt = certificate.name.split('.').pop();
-      const fileName = `nurses/${authData.user.id}/certificate.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, certificate);
-      if (uploadError) throw uploadError;
-      const { error: dbError } = await supabase.from("nurses").insert({
-        id: authData.user.id,
-        first_name: form.firstName,
-        last_name: form.lastName,
-        email: form.email,
-        phone: form.phone,
-        qualification: form.qualification,
-        experience: parseInt(form.experience),
-        document_url: fileName,
-        status: "active",
-      });
-      if (dbError) throw dbError;
-      alert("Registration successful! You can now log in to your account.");
-      navigate("/login");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="register-form">
-      <h2>Nurse Registration</h2>
-      {error && <p className="error-msg">{error}</p>}
-      <div className="form-row">
-        <input name="firstName" placeholder="First Name" required onChange={handle} />
-        <input name="lastName" placeholder="Last Name" required onChange={handle} />
-      </div>
-      <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
-      <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
-      <select name="qualification" required onChange={handle} defaultValue="">
-        <option value="" disabled>Select Your Nursing Qualification</option>
-        {nursingQualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
-      </select>
-      <input name="experience" placeholder="Years of Experience" type="number" required onChange={handle} />
-      <label className="file-label">
-        Upload Certificate / Proof of Qualification
-        <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
-      </label>
-      <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
-      <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
-      <TermsBox agreed={agreed} setAgreed={setAgreed} />
-      <button type="submit" disabled={loading || !agreed}>
-        {loading ? "Submitting..." : "Create Account"}
-      </button>
-    </form>
-  );
-}
 export default Register;

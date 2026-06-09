@@ -82,9 +82,21 @@ function Login() {
 
       if (role === "doctor") {
         const { data: doctor } = await supabase.from("doctors").select("status").eq("id", data.user.id).single();
+        if (doctor?.status === "pending") {
+          await supabase.auth.signOut();
+          setError("Your application is under review. You will be notified once approved.");
+          setLoading(false);
+          return;
+        }
         if (doctor?.status === "frozen") {
           await supabase.auth.signOut();
           setError("Your account has been suspended. Please contact support.");
+          setLoading(false);
+          return;
+        }
+        if (doctor?.status === "rejected") {
+          await supabase.auth.signOut();
+          setError("Your application was rejected. Please contact support@bookmylocum.com.");
           setLoading(false);
           return;
         }
@@ -98,9 +110,21 @@ function Login() {
           setLoading(false);
           return;
         }
+        if (nurse.status === "pending") {
+          await supabase.auth.signOut();
+          setError("Your application is under review. You will be notified once approved.");
+          setLoading(false);
+          return;
+        }
         if (nurse.status === "frozen") {
           await supabase.auth.signOut();
           setError("Your account has been suspended. Please contact support.");
+          setLoading(false);
+          return;
+        }
+        if (nurse.status === "rejected") {
+          await supabase.auth.signOut();
+          setError("Your application was rejected. Please contact support@bookmylocum.com.");
           setLoading(false);
           return;
         }

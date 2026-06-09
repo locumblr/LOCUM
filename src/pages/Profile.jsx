@@ -5,6 +5,35 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import "./Profile.css";
 
+const doctorQualificationsList = [
+  "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
+  "MD - General Medicine", "MD - Paediatrics", "MD - Psychiatry",
+  "MD - Dermatology", "MD - Anaesthesiology", "MD - Radiology",
+  "MD - Radiology with PCPNDT Certification", "MD - Pathology",
+  "MD - Microbiology", "MD - Biochemistry", "MD - Community Medicine",
+  "MS - General Surgery", "MS - Orthopaedics", "MS - Ophthalmology",
+  "MS - ENT (Otorhinolaryngology)", "MS - Obstetrics & Gynaecology",
+  "MCh - Neurosurgery", "MCh - Cardiothoracic Surgery", "MCh - Plastic Surgery",
+  "MCh - Urology", "DM - Cardiology", "DM - Neurology", "DM - Nephrology",
+  "DM - Gastroenterology", "DM - Endocrinology", "DM - Oncology",
+  "DNB - General Medicine", "DNB - General Surgery", "DNB - Paediatrics",
+  "DNB - Obstetrics & Gynaecology", "DNB - Orthopaedics", "DNB - Anaesthesiology",
+  "BDS / MDS (Dentistry)", "B.Pharm / M.Pharm (Pharmacy)",
+  "Diploma in Anaesthesiology (DA)", "Diploma in Child Health (DCH)",
+  "Diploma in Obstetrics & Gynaecology (DGO)", "Diploma in Orthopaedics (D.Ortho)",
+  "Diploma in Ophthalmology (DO)", "Diploma in ENT", "Diploma in Radiology (DMRD)",
+  "Diploma in Radiology (DMRD) with PCPNDT Certification",
+  "PCPNDT Certified Sonologist", "Fellowship in Emergency Medicine (FCEM)", "Other",
+];
+
+const nursingQualificationsList = [
+  "GNM (General Nursing & Midwifery)", "B.Sc Nursing", "Post Basic B.Sc Nursing",
+  "M.Sc Nursing", "Critical Care Nursing", "Operation Theatre Nursing",
+  "Emergency & Trauma Nursing", "Paediatric Nursing", "Oncology Nursing",
+  "Dialysis Nursing", "ICU Nursing", "NICU Nursing", "PICU Nursing",
+  "Midwifery", "Community Health Nursing", "Psychiatric Nursing", "Other",
+];
+
 function DepartmentCard({ dept, onUpdatePay, onUpdatePassword }) {
   const [editingPay, setEditingPay] = useState(false);
   const [newPay, setNewPay] = useState(dept.fixed_pay || 0);
@@ -23,20 +52,12 @@ function DepartmentCard({ dept, onUpdatePay, onUpdatePassword }) {
           <p style={{ fontSize: 12, color: "#888", margin: "0 0 4px" }}>Fixed Pay</p>
           {editingPay ? (
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="number"
-                value={newPay}
-                onChange={(e) => setNewPay(e.target.value)}
-                style={{ width: 90, padding: "6px 10px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14 }}
-              />
+              <input type="number" value={newPay} onChange={(e) => setNewPay(e.target.value)}
+                style={{ width: 90, padding: "6px 10px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14 }} />
               <button onClick={() => { onUpdatePay(dept.id, newPay); setEditingPay(false); }}
-                style={{ padding: "6px 12px", background: "#27ae60", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
-                Save
-              </button>
+                style={{ padding: "6px 12px", background: "#27ae60", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Save</button>
               <button onClick={() => setEditingPay(false)}
-                style={{ padding: "6px 12px", background: "#f0f0f0", color: "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
-                Cancel
-              </button>
+                style={{ padding: "6px 12px", background: "#f0f0f0", color: "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Cancel</button>
             </div>
           ) : (
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -44,30 +65,20 @@ function DepartmentCard({ dept, onUpdatePay, onUpdatePassword }) {
                 {dept.fixed_pay > 0 ? `Rs.${parseFloat(dept.fixed_pay).toLocaleString()}` : "Not set"}
               </span>
               <button onClick={() => setEditingPay(true)}
-                style={{ padding: "4px 10px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
-                ✏️ Edit
-              </button>
+                style={{ padding: "4px 10px", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>✏️ Edit</button>
             </div>
           )}
         </div>
       </div>
       {editingPassword ? (
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
-          <input
-            type="text"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
+          <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
             placeholder="New password (min 6 chars)"
-            style={{ flex: 1, padding: "8px 12px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14, minWidth: 160 }}
-          />
+            style={{ flex: 1, padding: "8px 12px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14, minWidth: 160 }} />
           <button onClick={() => { onUpdatePassword(dept.id, newPassword); setEditingPassword(false); setNewPassword(""); }}
-            style={{ padding: "8px 14px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
-            Save
-          </button>
+            style={{ padding: "8px 14px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Save</button>
           <button onClick={() => { setEditingPassword(false); setNewPassword(""); }}
-            style={{ padding: "8px 14px", background: "#f0f0f0", color: "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
-            Cancel
-          </button>
+            style={{ padding: "8px 14px", background: "#f0f0f0", color: "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>Cancel</button>
         </div>
       ) : (
         <button onClick={() => setEditingPassword(true)}
@@ -95,13 +106,15 @@ function Profile() {
   const [deptLoading, setDeptLoading] = useState(false);
   const [newDept, setNewDept] = useState({ name: "" });
   const [addingDept, setAddingDept] = useState(false);
+  const [additionalQual, setAdditionalQual] = useState({ degree: "", certificate: null });
+  const [addingQual, setAddingQual] = useState(false);
+  const [additionalQuals, setAdditionalQuals] = useState([]);
 
   const [personal, setPersonal] = useState({
     firstName: "", lastName: "", email: "",
     phone: "", hospitalName: "",
     address: "", registrationNumber: "", contactPerson: "",
   });
-
   const [qualification, setQualification] = useState({ degree: "", experience: "" });
   const [password, setPassword] = useState({ newPass: "", confirm: "" });
 
@@ -118,12 +131,14 @@ function Profile() {
       if (data) {
         setPersonal({ firstName: data.first_name || "", lastName: data.last_name || "", email: data.email || "", phone: data.phone || "" });
         setQualification({ degree: data.qualification || "", experience: data.experience || "" });
+        setAdditionalQuals(data.additional_qualifications || []);
       }
     } else if (userRole === "nurse") {
       const { data } = await supabase.from("nurses").select("*").eq("id", user.id).single();
       if (data) {
         setPersonal({ firstName: data.first_name || "", lastName: data.last_name || "", email: data.email || "", phone: data.phone || "" });
         setQualification({ degree: data.qualification || "", experience: data.experience || "" });
+        setAdditionalQuals(data.additional_qualifications || []);
       }
     } else if (userRole === "hospital") {
       const { data } = await supabase.from("hospitals").select("*").eq("id", user.id).single();
@@ -218,6 +233,38 @@ function Profile() {
     setMarkingPaid(false);
   };
 
+  const saveAdditionalQual = async (e) => {
+    e.preventDefault();
+    if (!additionalQual.degree) { alert("Please select a qualification."); return; }
+    if (!additionalQual.certificate) { alert("Please upload the certificate for this qualification."); return; }
+    setAddingQual(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const table = role === "nurse" ? "nurses" : "doctors";
+    try {
+      const fileExt = additionalQual.certificate.name.split('.').pop();
+      const fileName = `${table}/${user.id}/cert_${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, additionalQual.certificate);
+      if (uploadError) throw uploadError;
+      const newEntry = `${additionalQual.degree}||${fileName}`;
+      const updated = [...additionalQuals, newEntry];
+      await supabase.from(table).update({ additional_qualifications: updated }).eq("id", user.id);
+      const { data: admins } = await supabase.from("admins").select("id");
+      for (const admin of admins || []) {
+        await supabase.from("notifications").insert({
+          user_id: admin.id,
+          title: "📋 New Qualification Added — Verification Required",
+          message: `${role === "doctor" ? `Dr. ${personal.firstName} ${personal.lastName}` : `${personal.firstName} ${personal.lastName}`} has added a new qualification: ${additionalQual.degree}. Please verify the certificate.`,
+        });
+      }
+      setAdditionalQuals(updated);
+      alert("Qualification submitted! Admin will verify your certificate shortly.");
+      setAdditionalQual({ degree: "", certificate: null });
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
+    setAddingQual(false);
+  };
+
   const getMonthLabel = (monthStr) => {
     if (!monthStr) return "";
     const [year, month] = monthStr.split("-");
@@ -228,10 +275,8 @@ function Profile() {
     const { data: duties } = await supabase.from("locum_duties").select("*").eq("hospital_id", invoice.hospital_id).eq("completed", true);
     const { data: doctorDetails } = await supabase.from("doctors").select("id, first_name, last_name");
     const { data: nurseDetails } = await supabase.from("nurses").select("id, first_name, last_name");
-
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-
     doc.setFillColor(30, 58, 95);
     doc.rect(0, 0, pageWidth, 40, "F");
     doc.setTextColor(255, 255, 255);
@@ -240,30 +285,24 @@ function Profile() {
     doc.setFontSize(10); doc.setFont("helvetica", "normal");
     doc.text("Healthcare Technologies, Bangalore, India", 20, 32);
     doc.text("locum.blr@gmail.com", pageWidth - 20, 32, { align: "right" });
-
     doc.setTextColor(30, 58, 95);
     doc.setFontSize(20); doc.setFont("helvetica", "bold");
     doc.text("INVOICE", pageWidth - 20, 55, { align: "right" });
-
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
     const invoiceNumber = `INV-${invoice.billing_month}-${invoice.hospital_id?.slice(0, 6).toUpperCase()}`;
     doc.text(`Invoice No: ${invoiceNumber}`, pageWidth - 20, 63, { align: "right" });
     doc.text(`Date: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - 20, 70, { align: "right" });
     doc.text(`Due Date: ${invoice.due_date}`, pageWidth - 20, 77, { align: "right" });
-
     doc.setTextColor(30, 58, 95); doc.setFontSize(11); doc.setFont("helvetica", "bold");
     doc.text("Bill To:", 20, 55);
     doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50); doc.setFontSize(10);
     doc.text(hospitalName || personal.hospitalName, 20, 63);
-
     doc.setDrawColor(30, 58, 95); doc.setLineWidth(0.5);
     doc.line(20, 85, pageWidth - 20, 85);
-
     const [year, month] = invoice.billing_month.split("-");
     const monthLabel = new Date(year, month - 1).toLocaleString("default", { month: "long", year: "numeric" });
     doc.setTextColor(30, 58, 95); doc.setFontSize(11); doc.setFont("helvetica", "bold");
     doc.text(`Billing Period: ${monthLabel}`, 20, 95);
-
     const dutyRows = (duties || []).map(duty => {
       let staffName = "—";
       if (duty.booked_by) {
@@ -272,16 +311,8 @@ function Profile() {
         if (doctor) staffName = `Dr. ${doctor.first_name} ${doctor.last_name}`;
         else if (nurse) staffName = `${nurse.first_name} ${nurse.last_name}`;
       }
-      return [
-        duty.date || "—",
-        `${duty.start_time || ""} - ${duty.end_time || ""}`,
-        duty.qualification || "—",
-        staffName,
-        `Rs.${(duty.gross_pay || duty.pay || 0).toLocaleString("en-IN")}`,
-        `Rs.${(duty.platform_fee || 0).toLocaleString("en-IN")}`,
-      ];
+      return [duty.date || "—", `${duty.start_time || ""} - ${duty.end_time || ""}`, duty.qualification || "—", staffName, `Rs.${(duty.gross_pay || duty.pay || 0).toLocaleString("en-IN")}`, `Rs.${(duty.platform_fee || 0).toLocaleString("en-IN")}`];
     });
-
     autoTable(doc, {
       startY: 102,
       head: [["Date", "Time", "Qualification", "Staff", "Gross Pay", "Platform Fee"]],
@@ -292,7 +323,6 @@ function Profile() {
       margin: { left: 20, right: 20 },
       styles: { font: "helvetica", overflow: "linebreak" },
     });
-
     const summaryY = doc.lastAutoTable.finalY + 8;
     autoTable(doc, {
       startY: summaryY,
@@ -316,7 +346,6 @@ function Profile() {
       margin: { left: 20, right: 20 },
       styles: { font: "helvetica" },
     });
-
     const finalY = doc.lastAutoTable.finalY + 12;
     doc.setFillColor(240, 244, 248);
     doc.rect(20, finalY, pageWidth - 40, 28, "F");
@@ -325,22 +354,18 @@ function Profile() {
     doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
     doc.text(`Payment due by ${invoice.due_date}. Late payments attract a fine of Rs.500 per week.`, 28, finalY + 18);
     doc.text("Accounts frozen for non-payment beyond 14 days.", 28, finalY + 25);
-
     doc.setTextColor(30, 58, 95); doc.setFontSize(10); doc.setFont("helvetica", "bold");
     doc.text("Payment Details", 20, finalY + 44);
     doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
     doc.text("Please contact locum.blr@gmail.com for bank transfer details.", 20, finalY + 52);
-
     if (invoice.status === "paid") {
       doc.setTextColor(46, 125, 50); doc.setFontSize(28); doc.setFont("helvetica", "bold");
       doc.text("PAID", pageWidth - 20, finalY + 52, { align: "right" });
     }
-
     doc.setDrawColor(200, 200, 200);
     doc.line(20, doc.internal.pageSize.getHeight() - 20, pageWidth - 20, doc.internal.pageSize.getHeight() - 20);
     doc.setFontSize(9); doc.setTextColor(150, 150, 150); doc.setFont("helvetica", "normal");
     doc.text("LOCUM Healthcare Technologies | Bangalore, India | locum.blr@gmail.com", pageWidth / 2, doc.internal.pageSize.getHeight() - 12, { align: "center" });
-
     doc.save(`LOCUM-Invoice-${invoiceNumber}.pdf`);
   };
 
@@ -452,6 +477,9 @@ function Profile() {
         {(role === "doctor" || role === "nurse") && (
           <button className={activeTab === "qualification" ? "active" : ""} onClick={() => setActiveTab("qualification")}>Qualification</button>
         )}
+        {(role === "doctor" || role === "nurse") && (
+          <button className={activeTab === "additional" ? "active" : ""} onClick={() => setActiveTab("additional")}>+ Add Qualification</button>
+        )}
         <button className={activeTab === "password" ? "active" : ""} onClick={() => setActiveTab("password")}>Change Password</button>
         <button className={activeTab === "history" ? "active" : ""} onClick={() => { setActiveTab("history"); fetchHistory(); }}>Duty History</button>
         {role === "hospital" && (
@@ -469,6 +497,7 @@ function Profile() {
         )}
       </div>
 
+      {/* ── PERSONAL ── */}
       {activeTab === "personal" && (
         <form onSubmit={savePersonal} className="profile-form">
           {role === "doctor" || role === "nurse" ? (
@@ -520,10 +549,11 @@ function Profile() {
         </form>
       )}
 
+      {/* ── QUALIFICATION ── */}
       {activeTab === "qualification" && (role === "doctor" || role === "nurse") && (
         <form onSubmit={saveQualification} className="profile-form">
           <div className="form-group">
-            <label>Qualification</label>
+            <label>Primary Qualification</label>
             <input value={qualification.degree} onChange={(e) => setQualification({ ...qualification, degree: e.target.value })} required />
           </div>
           <div className="form-group">
@@ -534,6 +564,66 @@ function Profile() {
         </form>
       )}
 
+      {/* ── ADDITIONAL QUALIFICATIONS ── */}
+      {activeTab === "additional" && (role === "doctor" || role === "nurse") && (
+        <div className="history-section">
+          <div style={{ background: "#e8f5e9", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#2e7d32", lineHeight: 1.6 }}>
+            ✅ Add additional degrees or qualifications here. Each one must be verified by admin before hospitals can see it. Your registration number covers all qualifications.
+          </div>
+
+          {additionalQuals.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <h3 style={{ color: "#1e3a5f", marginBottom: 12, fontSize: 16 }}>Your Additional Qualifications</h3>
+              {additionalQuals.map((q, i) => {
+                const [degree] = q.split("||");
+                return (
+                  <div key={i} style={{ background: "white", borderRadius: 10, padding: "14px 16px", marginBottom: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", borderLeft: "4px solid #1e3a5f", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 600, color: "#1e3a5f", fontSize: 14 }}>{degree}</p>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: "#27ae60" }}>✅ Certificate uploaded</p>
+                    </div>
+                    <span style={{ background: "#e8f5e9", color: "#2e7d32", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>Submitted</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <h3 style={{ color: "#1e3a5f", marginBottom: 16, fontSize: 16 }}>Add New Qualification</h3>
+          <form onSubmit={saveAdditionalQual} className="profile-form">
+            <div className="form-group">
+              <label>Select Qualification</label>
+              <select
+                value={additionalQual.degree}
+                onChange={(e) => setAdditionalQual({ ...additionalQual, degree: e.target.value })}
+                required
+              >
+                <option value="" disabled>Select qualification...</option>
+                {(role === "nurse" ? nursingQualificationsList : doctorQualificationsList).map(q => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Upload Certificate for this Qualification</label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.png"
+                onChange={(e) => setAdditionalQual({ ...additionalQual, certificate: e.target.files[0] })}
+                required
+              />
+              {additionalQual.certificate && (
+                <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {additionalQual.certificate.name}</p>
+              )}
+            </div>
+            <button type="submit" className="save-btn" disabled={addingQual}>
+              {addingQual ? "Uploading..." : "Submit for Verification"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ── PASSWORD ── */}
       {activeTab === "password" && (
         <form onSubmit={savePassword} className="profile-form">
           <div className="form-group">
@@ -548,6 +638,7 @@ function Profile() {
         </form>
       )}
 
+      {/* ── PAYMENTS ── */}
       {activeTab === "payments" && role === "hospital" && (
         <div className="history-section">
           {pendingInvoice ? (
@@ -614,12 +705,12 @@ function Profile() {
         </div>
       )}
 
+      {/* ── DEPARTMENTS ── */}
       {activeTab === "departments" && role === "hospital" && (
         <div className="history-section">
           <div style={{ background: "#e3f2fd", borderRadius: 10, padding: 16, marginBottom: 24, fontSize: 14, color: "#1565c0" }}>
             ℹ️ Department accounts can post locum duties, manage bookings and submit reviews. They cannot see any financial information. Default password is <strong>123456</strong>. Login at <strong>/department/login</strong>.
           </div>
-
           <form onSubmit={addDepartment} style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             <input
               value={newDept.name}
@@ -632,24 +723,19 @@ function Profile() {
               {addingDept ? "Adding..." : "+ Add Department"}
             </button>
           </form>
-
           {deptLoading ? (
             <p style={{ color: "#888" }}>Loading departments...</p>
           ) : departments.length === 0 ? (
             <p style={{ color: "#888", textAlign: "center", padding: 40 }}>No departments yet. They will be auto-created when your account is approved by admin.</p>
           ) : (
             departments.map(dept => (
-              <DepartmentCard
-                key={dept.id}
-                dept={dept}
-                onUpdatePay={updateDeptFixedPay}
-                onUpdatePassword={updateDeptPassword}
-              />
+              <DepartmentCard key={dept.id} dept={dept} onUpdatePay={updateDeptFixedPay} onUpdatePassword={updateDeptPassword} />
             ))
           )}
         </div>
       )}
 
+      {/* ── HISTORY ── */}
       {activeTab === "history" && (
         <div className="history-section">
           {historyLoading ? (
@@ -672,7 +758,6 @@ function Profile() {
                   <div className="history-stat green"><h3>{dutyHistory.length}</h3><p>Total Posted</p></div>
                 )}
               </div>
-
               {upcomingDuties.length > 0 && (
                 <>
                   <h3 className="history-section-title">📅 Upcoming Duties</h3>
@@ -693,7 +778,6 @@ function Profile() {
                   ))}
                 </>
               )}
-
               {pendingDuties.length > 0 && (
                 <>
                   <h3 className="history-section-title">⏳ Pending Duties</h3>
@@ -714,7 +798,6 @@ function Profile() {
                   ))}
                 </>
               )}
-
               {completedDuties.length > 0 && (
                 <>
                   <h3 className="history-section-title">✅ Completed Duties</h3>
