@@ -4,6 +4,30 @@ import { supabase } from "../supabaseClient";
 import "./Register.css";
 import logo from "../assets/logo.png";
 
+const RESEND_API_KEY = "re_ioKynYaT_7PSAWgetJWydU68JNvkJG3NG";
+
+const sendEmail = async ({ to, subject, html }) => {
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "LOCUM <noreply@bookmylocum.com>",
+        reply_to: "locum.blr@gmail.com",
+        to: [to],
+        subject,
+        html,
+      }),
+    });
+  } catch (err) {
+    // Non-blocking — don't fail registration if email fails
+    console.error("Email send failed:", err);
+  }
+};
+
 const doctorQualifications = [
   "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
   "MD - General Medicine", "MD - Paediatrics", "MD - Psychiatry",
@@ -34,60 +58,33 @@ const nursingQualifications = [
 ];
 
 const stateMedicalCouncils = [
-  "Andhra Pradesh Medical Council",
-  "Arunachal Pradesh Medical Council",
-  "Assam Medical Council",
-  "Bihar Medical Council",
-  "Chhattisgarh Medical Council",
-  "Delhi Medical Council",
-  "Goa Medical Council",
-  "Gujarat Medical Council",
-  "Haryana Medical Council",
-  "Himachal Pradesh Medical Council",
-  "Jammu & Kashmir Medical Council",
-  "Jharkhand Medical Council",
-  "Karnataka Medical Council",
-  "Kerala Medical Council",
-  "Madhya Pradesh Medical Council",
-  "Maharashtra Medical Council",
-  "Manipur Medical Council",
-  "Meghalaya Medical Council",
-  "Mizoram Medical Council",
-  "Nagaland Medical Council",
-  "Odisha Medical Council",
-  "Punjab Medical Council",
-  "Rajasthan Medical Council",
-  "Sikkim Medical Council",
-  "Tamil Nadu Medical Council",
-  "Telangana State Medical Council",
-  "Tripura Medical Council",
-  "Uttar Pradesh Medical Council",
-  "Uttarakhand Medical Council",
-  "West Bengal Medical Council",
-  "National Medical Commission (NMC)",
+  "Andhra Pradesh Medical Council", "Arunachal Pradesh Medical Council",
+  "Assam Medical Council", "Bihar Medical Council", "Chhattisgarh Medical Council",
+  "Delhi Medical Council", "Goa Medical Council", "Gujarat Medical Council",
+  "Haryana Medical Council", "Himachal Pradesh Medical Council",
+  "Jammu & Kashmir Medical Council", "Jharkhand Medical Council",
+  "Karnataka Medical Council", "Kerala Medical Council",
+  "Madhya Pradesh Medical Council", "Maharashtra Medical Council",
+  "Manipur Medical Council", "Meghalaya Medical Council", "Mizoram Medical Council",
+  "Nagaland Medical Council", "Odisha Medical Council", "Punjab Medical Council",
+  "Rajasthan Medical Council", "Sikkim Medical Council", "Tamil Nadu Medical Council",
+  "Telangana State Medical Council", "Tripura Medical Council",
+  "Uttar Pradesh Medical Council", "Uttarakhand Medical Council",
+  "West Bengal Medical Council", "National Medical Commission (NMC)",
 ];
 
 const stateNursingCouncils = [
   "Andhra Pradesh Nurses and Midwives Council",
   "Assam Nurses, Midwives and Health Visitors Council",
-  "Bihar Nurses Registration Council",
-  "Delhi Nursing Council",
-  "Goa Nursing Council",
-  "Gujarat Nursing Council",
-  "Haryana Nursing Council",
-  "Himachal Pradesh Nursing Council",
-  "Karnataka Nursing Council",
+  "Bihar Nurses Registration Council", "Delhi Nursing Council",
+  "Goa Nursing Council", "Gujarat Nursing Council", "Haryana Nursing Council",
+  "Himachal Pradesh Nursing Council", "Karnataka Nursing Council",
   "Kerala Nurses and Midwives Council",
-  "Madhya Pradesh Nurses Registration Council",
-  "Maharashtra Nursing Council",
-  "Odisha Nursing Council",
-  "Punjab Nurses Registration Council",
-  "Rajasthan Nursing Council",
-  "Tamil Nadu Nurses and Midwives Council",
-  "Telangana Nursing Council",
-  "Uttar Pradesh Nurses and Midwives Council",
-  "West Bengal Nursing Council",
-  "Indian Nursing Council (INC)",
+  "Madhya Pradesh Nurses Registration Council", "Maharashtra Nursing Council",
+  "Odisha Nursing Council", "Punjab Nurses Registration Council",
+  "Rajasthan Nursing Council", "Tamil Nadu Nurses and Midwives Council",
+  "Telangana Nursing Council", "Uttar Pradesh Nurses and Midwives Council",
+  "West Bengal Nursing Council", "Indian Nursing Council (INC)",
 ];
 
 function TermsBox({ agreed, setAgreed }) {
@@ -169,13 +166,15 @@ function DoctorForm({ navigate }) {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
-        options: { data: { role: "doctor" } }
+        options: { data: { role: "doctor" } },
       });
       if (authError) throw authError;
-      const fileExt = certificate.name.split('.').pop();
+
+      const fileExt = certificate.name.split(".").pop();
       const fileName = `doctors/${authData.user.id}/certificate.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, certificate);
       if (uploadError) throw uploadError;
+
       const { error: dbError } = await supabase.from("doctors").insert({
         id: authData.user.id,
         first_name: form.firstName,
@@ -190,6 +189,24 @@ function DoctorForm({ navigate }) {
         status: "pending",
       });
       if (dbError) throw dbError;
+
+      await sendEmail({
+        to: form.email,
+        subject: "Application Received – LOCUM",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+            <h1 style="color: #1e3a5f;">LOCUM</h1>
+            <h2>Hi Dr. ${form.firstName} ${form.lastName},</h2>
+            <p>Thank you for registering on <strong>LOCUM</strong>.</p>
+            <p>Your application is currently <strong>pending verification</strong> by our team. This usually takes up to <strong>24 hours</strong>.</p>
+            <p>You will receive another email once your account is approved and active.</p>
+            <br/>
+            <p style="color: #888; font-size: 13px;">If you have any questions, reply to this email or contact us at <a href="mailto:locum.blr@gmail.com">locum.blr@gmail.com</a></p>
+            <p style="color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+          </div>
+        `,
+      });
+
       await supabase.auth.signOut();
       alert("Application submitted! Our team will verify your registration and notify you once approved. This usually takes 24 hours.");
       navigate("/login");
@@ -203,27 +220,21 @@ function DoctorForm({ navigate }) {
   return (
     <form onSubmit={submit} className="register-form">
       <h2>Doctor Registration</h2>
-
       <div style={{ background: "#e3f2fd", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#1565c0", lineHeight: 1.6 }}>
         ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
       </div>
-
       {error && <p className="error-msg">{error}</p>}
-
       <div className="form-row">
         <input name="firstName" placeholder="First Name" required onChange={handle} />
         <input name="lastName" placeholder="Last Name" required onChange={handle} />
       </div>
       <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
       <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
-
       <select name="qualification" required onChange={handle} defaultValue="">
         <option value="" disabled>Select Your Primary Qualification</option>
         {doctorQualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
       </select>
-
       <input name="experience" placeholder="Years of Experience" type="number" min="0" required onChange={handle} />
-
       <div style={{ background: "#f9fafb", borderRadius: 10, padding: "14px 16px", marginBottom: 4, border: "1px solid #e0e0e0" }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>
           Medical Registration Details
@@ -249,13 +260,11 @@ function DoctorForm({ navigate }) {
           Your registration number will be verified against the NMC registry before activation.
         </p>
       </div>
-
       <label className="file-label">
         Upload Primary Certificate / Proof of Qualification
         <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
       </label>
       {certificate && <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {certificate.name}</p>}
-
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
       <TermsBox agreed={agreed} setAgreed={setAgreed} />
@@ -291,13 +300,15 @@ function NurseForm({ navigate }) {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
-        options: { data: { role: "nurse" } }
+        options: { data: { role: "nurse" } },
       });
       if (authError) throw authError;
-      const fileExt = certificate.name.split('.').pop();
+
+      const fileExt = certificate.name.split(".").pop();
       const fileName = `nurses/${authData.user.id}/certificate.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, certificate);
       if (uploadError) throw uploadError;
+
       const { error: dbError } = await supabase.from("nurses").insert({
         id: authData.user.id,
         first_name: form.firstName,
@@ -312,6 +323,24 @@ function NurseForm({ navigate }) {
         status: "pending",
       });
       if (dbError) throw dbError;
+
+      await sendEmail({
+        to: form.email,
+        subject: "Application Received – LOCUM",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+            <h1 style="color: #1e3a5f;">LOCUM</h1>
+            <h2>Hi ${form.firstName} ${form.lastName},</h2>
+            <p>Thank you for registering on <strong>LOCUM</strong>.</p>
+            <p>Your application is currently <strong>pending verification</strong> by our team. This usually takes up to <strong>24 hours</strong>.</p>
+            <p>You will receive another email once your account is approved and active.</p>
+            <br/>
+            <p style="color: #888; font-size: 13px;">If you have any questions, reply to this email or contact us at <a href="mailto:locum.blr@gmail.com">locum.blr@gmail.com</a></p>
+            <p style="color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+          </div>
+        `,
+      });
+
       await supabase.auth.signOut();
       alert("Application submitted! Our team will verify your registration and notify you once approved. This usually takes 24 hours.");
       navigate("/login");
@@ -325,27 +354,21 @@ function NurseForm({ navigate }) {
   return (
     <form onSubmit={submit} className="register-form">
       <h2>Nurse Registration</h2>
-
       <div style={{ background: "#f3e5f5", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#6a0dad", lineHeight: 1.6 }}>
         ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
       </div>
-
       {error && <p className="error-msg">{error}</p>}
-
       <div className="form-row">
         <input name="firstName" placeholder="First Name" required onChange={handle} />
         <input name="lastName" placeholder="Last Name" required onChange={handle} />
       </div>
       <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
       <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
-
       <select name="qualification" required onChange={handle} defaultValue="">
         <option value="" disabled>Select Your Primary Qualification</option>
         {nursingQualifications.map((q) => (<option key={q} value={q}>{q}</option>))}
       </select>
-
       <input name="experience" placeholder="Years of Experience" type="number" min="0" required onChange={handle} />
-
       <div style={{ background: "#f9fafb", borderRadius: 10, padding: "14px 16px", marginBottom: 4, border: "1px solid #e0e0e0" }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>
           Nursing Council Registration Details
@@ -371,13 +394,11 @@ function NurseForm({ navigate }) {
           Your registration number will be verified before activation.
         </p>
       </div>
-
       <label className="file-label">
         Upload Primary Certificate / Proof of Qualification
         <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
       </label>
       {certificate && <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {certificate.name}</p>}
-
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
       <TermsBox agreed={agreed} setAgreed={setAgreed} />
@@ -412,13 +433,15 @@ function HospitalForm({ navigate }) {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
-        options: { data: { role: "hospital" } }
+        options: { data: { role: "hospital" } },
       });
       if (authError) throw authError;
-      const fileExt = document.name.split('.').pop();
+
+      const fileExt = document.name.split(".").pop();
       const fileName = `hospitals/${authData.user.id}/certificate.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, document);
       if (uploadError) throw uploadError;
+
       const { error: dbError } = await supabase.from("hospitals").insert({
         id: authData.user.id,
         hospital_name: form.hospitalName,
@@ -431,6 +454,24 @@ function HospitalForm({ navigate }) {
         status: "pending",
       });
       if (dbError) throw dbError;
+
+      await sendEmail({
+        to: form.email,
+        subject: "Hospital Registration Received – LOCUM",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+            <h1 style="color: #1e3a5f;">LOCUM</h1>
+            <h2>Hi ${form.hospitalName},</h2>
+            <p>Thank you for registering on <strong>LOCUM</strong>.</p>
+            <p>Your hospital registration is currently <strong>pending verification</strong> by our team.</p>
+            <p>Once approved, your department accounts will be automatically created and you can start posting locum duties.</p>
+            <br/>
+            <p style="color: #888; font-size: 13px;">If you have any questions, reply to this email or contact us at <a href="mailto:locum.blr@gmail.com">locum.blr@gmail.com</a></p>
+            <p style="color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+          </div>
+        `,
+      });
+
       alert("Application submitted! Our team will review your registration and notify you once approved.");
       navigate("/");
     } catch (err) {
@@ -443,6 +484,9 @@ function HospitalForm({ navigate }) {
   return (
     <form onSubmit={submit} className="register-form">
       <h2>Hospital Registration</h2>
+      <div style={{ background: "#e8f5e9", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#2e7d32", lineHeight: 1.6 }}>
+        ℹ️ Your registration will be reviewed by our team. You will be notified once approved.
+      </div>
       {error && <p className="error-msg">{error}</p>}
       <input name="hospitalName" placeholder="Hospital / Clinic Name" required onChange={handle} />
       <input name="email" type="email" placeholder="Official Email Address" required onChange={handle} />
@@ -454,6 +498,7 @@ function HospitalForm({ navigate }) {
         Upload Registration Certificate
         <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setDocument(e.target.files[0])} required />
       </label>
+      {document && <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {document.name}</p>}
       <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
       <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
       <TermsBox agreed={agreed} setAgreed={setAgreed} />

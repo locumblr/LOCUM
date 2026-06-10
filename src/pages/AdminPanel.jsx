@@ -5,6 +5,33 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import "./AdminPanel.css";
 
+const RESEND_API_KEY = "re_ioKynYaT_7PSAWgetJWydU68JNvkJG3NG";
+
+const sendEmail = async ({ to, subject, html }) => {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "LOCUM <noreply@bookmylocum.com>",
+        reply_to: "locum.blr@gmail.com",
+        to: [to],
+        subject,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("Resend error:", err);
+    }
+  } catch (err) {
+    console.error("Email send failed:", err);
+  }
+};
+
 function AdminPanel() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("doctors");
@@ -123,6 +150,39 @@ function AdminPanel() {
           title: `📋 Invoice for ${getMonthLabel(billingMonth)}`,
           message: `Your invoice for ${getMonthLabel(billingMonth)} has been generated. Total due: Rs.${h.total_platform_fee.toLocaleString()}. Payment due by ${dueDateStr}. Late payments attract a Rs.500/week fine and account suspension.`,
         });
+        // Send invoice email to hospital
+        if (h.hospital?.email) {
+          await sendEmail({
+            to: h.hospital.email,
+            subject: `LOCUM Invoice – ${getMonthLabel(billingMonth)}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+                <h1 style="color: #1e3a5f;">LOCUM</h1>
+                <h2>Invoice for ${getMonthLabel(billingMonth)}</h2>
+                <p>Dear ${h.hospital.hospital_name},</p>
+                <p>Your invoice for <strong>${getMonthLabel(billingMonth)}</strong> has been generated.</p>
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                  <tr style="background: #f5f7fa;">
+                    <td style="padding: 10px; border: 1px solid #e0e0e0;">Total Duties</td>
+                    <td style="padding: 10px; border: 1px solid #e0e0e0; text-align: right;"><strong>${h.duties.length}</strong></td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px; border: 1px solid #e0e0e0;">Total Due (Platform Fee)</td>
+                    <td style="padding: 10px; border: 1px solid #e0e0e0; text-align: right;"><strong>Rs.${h.total_platform_fee.toLocaleString()}</strong></td>
+                  </tr>
+                  <tr style="background: #f5f7fa;">
+                    <td style="padding: 10px; border: 1px solid #e0e0e0;">Payment Due By</td>
+                    <td style="padding: 10px; border: 1px solid #e0e0e0; text-align: right;"><strong>${dueDateStr}</strong></td>
+                  </tr>
+                </table>
+                <p style="color: #e74c3c; font-size: 13px;">⚠️ Late payments attract a fine of Rs.500 per week. Accounts are frozen for non-payment beyond 14 days.</p>
+                <p>Log in to your dashboard to view the full invoice and mark payment once done.</p>
+                <a href="https://bookmylocum.com/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 16px;">View Dashboard</a>
+                <p style="margin-top: 24px; color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+              </div>
+            `,
+          });
+        }
         count++;
       }
     }
@@ -137,12 +197,8 @@ function AdminPanel() {
       .select("*")
       .eq("hospital_id", invoice.hospital_id)
       .eq("completed", true);
-    const { data: doctorDetails } = await supabase
-      .from("doctors")
-      .select("id, first_name, last_name");
-    const { data: nurseDetails } = await supabase
-      .from("nurses")
-      .select("id, first_name, last_name");
+    const { data: doctorDetails } = await supabase.from("doctors").select("id, first_name, last_name");
+    const { data: nurseDetails } = await supabase.from("nurses").select("id, first_name, last_name");
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -313,6 +369,23 @@ function AdminPanel() {
       title: "✅ Payment Verified — Account Cleared",
       message: "Your payment has been verified by LOCUM admin. Your account is now active and all dues have been cleared. Thank you!",
     });
+    if (hospital?.email) {
+      await sendEmail({
+        to: hospital.email,
+        subject: "Payment Verified – LOCUM",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+            <h1 style="color: #1e3a5f;">LOCUM</h1>
+            <h2 style="color: #27ae60;">✅ Payment Verified</h2>
+            <p>Dear ${hospital.hospital_name},</p>
+            <p>Your payment has been verified by our team. Your account is now <strong>active</strong> and all dues have been cleared.</p>
+            <p>Thank you for your prompt payment!</p>
+            <a href="https://bookmylocum.com/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 16px;">Go to Dashboard</a>
+            <p style="margin-top: 24px; color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+          </div>
+        `,
+      });
+    }
     alert("Payment verified! Hospital account cleared.");
     fetchData();
     fetchBilling();
@@ -353,27 +426,33 @@ function AdminPanel() {
   const updateStatus = async (table, id, status) => {
     const { error } = await supabase.from(table).update({ status }).eq("id", id);
     if (error) { alert("Error: " + error.message); return; }
+
+    // Approval emails for doctors and nurses
     if ((table === "doctors" || table === "nurses") && status === "active") {
       const professional = table === "doctors"
         ? doctors.find(d => d.id === id)
         : nurses.find(n => n.id === id);
-      if (professional) {
-        await supabase.functions.invoke("send-email", {
-          body: {
-            to: professional.email,
-            subject: "Your LOCUM Account Has Been Approved!",
-            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+      if (professional?.email) {
+        const isDoctor = table === "doctors";
+        await sendEmail({
+          to: professional.email,
+          subject: "Your LOCUM Account Has Been Approved!",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
               <h1 style="color: #1e3a5f;">LOCUM</h1>
-              <h2>Congratulations, ${table === "doctors" ? "Dr. " : ""}${professional.first_name} ${professional.last_name}!</h2>
-              <p>Your ${table === "doctors" ? "doctor" : "nurse"} account has been verified and approved. You can now log in and start booking locum duties.</p>
+              <h2 style="color: #27ae60;">🎉 Account Approved!</h2>
+              <p>Congratulations, ${isDoctor ? "Dr. " : ""}${professional.first_name} ${professional.last_name}!</p>
+              <p>Your ${isDoctor ? "doctor" : "nurse"} account has been <strong>verified and approved</strong>. You can now log in and start booking locum duties.</p>
               <a href="https://bookmylocum.com/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a>
-              <p style="margin-top: 24px; color: #888; font-size: 13px;">If you have any questions, contact us at locum.blr@gmail.com</p>
-            </div>`,
-          },
+              <p style="margin-top: 24px; color: #888; font-size: 13px;">If you have any questions, contact us at <a href="mailto:locum.blr@gmail.com">locum.blr@gmail.com</a></p>
+              <p style="color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+            </div>
+          `,
         });
       }
     }
 
+    // Approval email for hospitals
     if (table === "hospitals" && status === "active") {
       const hospital = hospitals.find(h => h.id === id);
       if (hospital) {
@@ -382,17 +461,29 @@ function AdminPanel() {
           hosp_id: hospital.id,
           hosp_name: hospital.hospital_name,
         });
-        // Send approval email
-        await supabase.functions.invoke("send-email", {
-          body: {
+        if (hospital.email) {
+          await sendEmail({
             to: hospital.email,
             subject: "Your LOCUM Hospital Account Has Been Approved!",
-            html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;"><h1 style="color: #1e3a5f;">LOCUM</h1><h2>Congratulations, ${hospital.hospital_name}!</h2><p>Your hospital account has been verified and approved.</p><p>Your department accounts have been automatically created. Log in to view your department codes and set fixed pay rates.</p><a href="https://bookmylocum.com/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a></div>`,
-          },
-        });
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px;">
+                <h1 style="color: #1e3a5f;">LOCUM</h1>
+                <h2 style="color: #27ae60;">🎉 Hospital Account Approved!</h2>
+                <p>Congratulations, ${hospital.hospital_name}!</p>
+                <p>Your hospital account has been <strong>verified and approved</strong>.</p>
+                <p>Your department accounts have been automatically created. Log in to view your department codes and set fixed pay rates.</p>
+                <a href="https://bookmylocum.com/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a>
+                <p style="margin-top: 24px; color: #888; font-size: 13px;">If you have any questions, contact us at <a href="mailto:locum.blr@gmail.com">locum.blr@gmail.com</a></p>
+                <p style="color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+              </div>
+            `,
+          });
+        }
       }
     }
-    alert(`Account ${status === "active" ? "approved" : status === "frozen" ? "frozen" : status === "rejected" ? "rejected" : "updated"}!`);
+
+    const label = status === "active" ? "approved" : status === "frozen" ? "frozen" : status === "rejected" ? "rejected" : "updated";
+    alert(`Account ${label}!`);
     setSelected(null);
     fetchData();
   };
@@ -494,16 +585,16 @@ function AdminPanel() {
                     <td>{doc.qualification}</td>
                     <td>{doc.experience} yrs</td>
                     <td><span className={`status-pill ${doc.status}`}>{doc.status}</span></td>
-<td>
-  <button className="view-btn" onClick={() => setSelected({ ...doc, type: "doctor" })}>View</button>
-  {doc.status === "pending" && <>
-    <button className="approve-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Approve</button>
-    <button className="reject-btn" onClick={() => updateStatus("doctors", doc.id, "rejected")}>Reject</button>
-  </>}
-  {doc.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("doctors", doc.id, "frozen")}>Freeze</button>}
-  {doc.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Unfreeze</button>}
-  <button className="delete-btn" onClick={() => deleteAccount("doctors", doc.id)}>Delete</button>
-</td>
+                    <td>
+                      <button className="view-btn" onClick={() => setSelected({ ...doc, type: "doctor" })}>View</button>
+                      {doc.status === "pending" && <>
+                        <button className="approve-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Approve</button>
+                        <button className="reject-btn" onClick={() => updateStatus("doctors", doc.id, "rejected")}>Reject</button>
+                      </>}
+                      {doc.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("doctors", doc.id, "frozen")}>Freeze</button>}
+                      {doc.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("doctors", doc.id, "active")}>Unfreeze</button>}
+                      <button className="delete-btn" onClick={() => deleteAccount("doctors", doc.id)}>Delete</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -529,11 +620,11 @@ function AdminPanel() {
                     <td>
                       <button className="view-btn" onClick={() => setSelected({ ...nur, type: "nurse" })}>View</button>
                       {nur.status === "pending" && <>
-  <button className="approve-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Approve</button>
-  <button className="reject-btn" onClick={() => updateStatus("nurses", nur.id, "rejected")}>Reject</button>
-</>}
-{nur.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("nurses", nur.id, "frozen")}>Freeze</button>}
-{nur.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Unfreeze</button>}
+                        <button className="approve-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Approve</button>
+                        <button className="reject-btn" onClick={() => updateStatus("nurses", nur.id, "rejected")}>Reject</button>
+                      </>}
+                      {nur.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("nurses", nur.id, "frozen")}>Freeze</button>}
+                      {nur.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Unfreeze</button>}
                       <button className="delete-btn" onClick={() => deleteAccount("nurses", nur.id)}>Delete</button>
                     </td>
                   </tr>
@@ -799,32 +890,32 @@ function AdminPanel() {
                 <div><label>Email</label><p>{selected.email}</p></div>
                 <div><label>Phone</label><p>{selected.phone}</p></div>
                 <div><label>Qualification</label><p>{selected.qualification}</p></div>
-<div><label>Experience</label><p>{selected.experience} years</p></div>
-{selected.nmc_registration_number && (
-  <div>
-    <label>NMC Registration No.</label>
-    <p style={{ display: "flex", alignItems: "center", gap: 10 }}>
-   {selected.nmc_registration_number}
-      <a
-        href="https://www.nmc.org.in/information-desk/indian-medical-register/"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ fontSize: 12, background: "#e3f2fd", color: "#1565c0", padding: "3px 10px", borderRadius: 6, textDecoration: "none" }}
-      >
-        🔍 Verify on NMC
-      </a>
-    </p>
-  </div>
-)}
-{selected.state_medical_council && (
-  <div><label>State Medical Council</label><p>{selected.state_medical_council}</p></div>
-)}
-{selected.registration_number && (
-  <div><label>Nursing Council Reg. No.</label><p>{selected.registration_number}</p></div>
-)}
-{selected.state_nursing_council && (
-  <div><label>State Nursing Council</label><p>{selected.state_nursing_council}</p></div>
-)}
+                <div><label>Experience</label><p>{selected.experience} years</p></div>
+                {selected.nmc_registration_number && (
+                  <div>
+                    <label>NMC Registration No.</label>
+                    <p style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {selected.nmc_registration_number}
+                      <a
+                        href="https://www.nmc.org.in/information-desk/indian-medical-register/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: 12, background: "#e3f2fd", color: "#1565c0", padding: "3px 10px", borderRadius: 6, textDecoration: "none" }}
+                      >
+                        🔍 Verify on NMC
+                      </a>
+                    </p>
+                  </div>
+                )}
+                {selected.state_medical_council && (
+                  <div><label>State Medical Council</label><p>{selected.state_medical_council}</p></div>
+                )}
+                {selected.registration_number && (
+                  <div><label>Nursing Council Reg. No.</label><p>{selected.registration_number}</p></div>
+                )}
+                {selected.state_nursing_council && (
+                  <div><label>State Nursing Council</label><p>{selected.state_nursing_council}</p></div>
+                )}
                 <div><label>Status</label><p>{selected.status}</p></div>
                 <div><label>Type</label><p style={{ textTransform: "capitalize" }}>{selected.type}</p></div>
                 {selected.flagged && <>
@@ -883,4 +974,3 @@ function AdminPanel() {
 }
 
 export default AdminPanel;
-
