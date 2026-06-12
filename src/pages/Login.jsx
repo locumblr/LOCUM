@@ -18,15 +18,21 @@ function Login() {
   const [resetSuccess, setResetSuccess] = useState(false);
 
   useEffect(() => {
-    // Listen for PASSWORD_RECOVERY event from Supabase reset link
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setShowReset(true);
-        setShowForgot(false);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  // Check URL hash for access_token on page load
+  const hash = window.location.hash;
+  if (hash && hash.includes("type=recovery")) {
+    setShowReset(true);
+    return;
+  }
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      setShowReset(true);
+      setShowForgot(false);
+    }
+  });
+  return () => subscription.unsubscribe();
+}, []);
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
