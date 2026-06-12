@@ -401,7 +401,7 @@ function HospitalDashboard() {
       </div>
 
       {showForm && (
-        <form onSubmit={submit} className="duty-form">
+         <div className="duty-form">
           <h2>Post a {showForm === "nurse" ? "Nurse" : "Doctor"} Locum Duty</h2>
           {showForm === "nurse" && (
             <div style={{ background: "#f3e5f5", border: "1px solid #6a0dad", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#4a0080" }}>
@@ -479,10 +479,10 @@ function HospitalDashboard() {
             <label>Additional Notes (optional)</label>
             <textarea name="notes" placeholder="Any special requirements..." onChange={handle} value={form.notes} rows={3} />
           </div>
-          <button type="submit" className="submit-btn" disabled={submitting}>
+          <button type="button" onClick={submit} className="submit-btn" disabled={submitting}>
             {submitting ? "Posting..." : "Post Duty"}
           </button>
-        </form>
+         </div>
       )}
 
       <h2>Posted Duties</h2>
