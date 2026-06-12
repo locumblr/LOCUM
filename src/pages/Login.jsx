@@ -18,12 +18,25 @@ function Login() {
   const [resetSuccess, setResetSuccess] = useState(false);
 
   useEffect(() => {
-  // Check URL hash for access_token on page load
-  const hash = window.location.hash;
-  if (hash && hash.includes("type=recovery")) {
-    setShowReset(true);
-    return;
-  }
+  const checkSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log("SESSION:", session);
+    if (session?.user && window.location.hash.includes("type=recovery")) {
+      setShowReset(true);
+      return;
+    }
+  };
+  checkSession();
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    console.log("AUTH EVENT:", event);
+    if (event === "PASSWORD_RECOVERY") {
+      setShowReset(true);
+      setShowForgot(false);
+    }
+  });
+  return () => subscription.unsubscribe();
+}, []);
 
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === "PASSWORD_RECOVERY") {
