@@ -15,6 +15,15 @@ const sendEmail = async ({ to, subject, html }) => {
   } catch (err) { console.error("Email error:", err); }
 };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const monthName = date.toLocaleString("default", { month: "long" });
+  const suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+  return `${monthName} ${day}${suffix}, ${year}`;
+};
+
 const allQualifications = [
   "MBBS (Bachelor of Medicine and Bachelor of Surgery)",
   "MD - General Medicine", "MD - Paediatrics", "MD - Psychiatry",
@@ -431,15 +440,16 @@ function HospitalDashboard() {
                 <span style={{ float: "right" }}>{showQualDropdown ? "▲" : "▼"}</span>
               </div>
               {showQualDropdown && (
-                <div className="qual-dropdown-list">
-                  {(showForm === "nurse" ? nursingQualifications : allQualifications).map((q) => (
-                    <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}>
-                      <input type="checkbox" checked={form.qualifications.includes(q)} onChange={() => toggleQualification(q)} />
-                      <span>{q}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
+  <div className="qual-dropdown-list" style={{ writingMode: "horizontal-tb", direction: "ltr" }}>
+    {(showForm === "nurse" ? nursingQualifications : allQualifications).map((q) => (
+      <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}
+        style={{ writingMode: "horizontal-tb", direction: "ltr", display: "flex", flexDirection: "row" }}>
+        <input type="checkbox" checked={form.qualifications.includes(q)} onChange={() => toggleQualification(q)} />
+        <span style={{ writingMode: "horizontal-tb", direction: "ltr" }}>{q}</span>
+      </label>
+    ))}
+  </div>
+)}
             </div>
             {form.qualifications.length > 0 && (
               <div className="selected-quals">
@@ -493,7 +503,7 @@ function HospitalDashboard() {
                   <span className="pay">Rs.{(duty.gross_pay || duty.pay).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
-                  <p>📅 {duty.date}</p>
+                  <p>📅 {formatDate(duty.date)}</p>
                   <p>🕐 {duty.start_time} - {duty.end_time}</p>
                   {duty.duty_type === "nurse" && (
                     <span style={{ background: "#f3e5f5", color: "#6a0dad", padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>Nurse Duty</span>
