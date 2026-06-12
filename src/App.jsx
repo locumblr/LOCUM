@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { supabase } from "./supabaseClient";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -23,13 +25,20 @@ import DepartmentLogin from "./pages/DepartmentLogin";
 import DepartmentDashboard from "./pages/DepartmentDashboard";
 import DepartmentProfile from "./pages/DepartmentProfile";
 
-
 function App() {
+  useEffect(() => {
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        window.location.href = "/reset-password";
+      }
+    });
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-<Route path="/app" element={<Home />} />
+        <Route path="/app" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -46,12 +55,12 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/support" element={<Support />} />
         <Route path="/nurse/dashboard" element={<NurseDashboard />} />
-<Route path="/nurse/locums" element={<NurseLocums />} />
-<Route path="/nurse/profile" element={<Profile />} />
-<Route path="/help" element={<Help />} />
-<Route path="/department/login" element={<DepartmentLogin />} />
-<Route path="/department/dashboard" element={<DepartmentDashboard />} />
-<Route path="/department/profile" element={<DepartmentProfile />} />
+        <Route path="/nurse/locums" element={<NurseLocums />} />
+        <Route path="/nurse/profile" element={<Profile />} />
+        <Route path="/help" element={<Help />} />
+        <Route path="/department/login" element={<DepartmentLogin />} />
+        <Route path="/department/dashboard" element={<DepartmentDashboard />} />
+        <Route path="/department/profile" element={<DepartmentProfile />} />
       </Routes>
     </BrowserRouter>
   );
