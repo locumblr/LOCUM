@@ -18,34 +18,28 @@ function Login() {
   const [resetSuccess, setResetSuccess] = useState(false);
 
   useEffect(() => {
-  const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log("SESSION:", session);
-    if (session?.user && window.location.hash.includes("type=recovery")) {
-      setShowReset(true);
+    // Check for token_hash in URL query params (Supabase token-based flow)
+    const params = new URLSearchParams(window.location.search);
+    const tokenHash = params.get("token_hash");
+    const type = params.get("type");
+
+    if (tokenHash && type === "recovery") {
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" })
+        .then(({ data, error }) => {
+          if (!error) setShowReset(true);
+        });
       return;
     }
-  };
-  checkSession();
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    console.log("AUTH EVENT:", event);
-    if (event === "PASSWORD_RECOVERY") {
-      setShowReset(true);
-      setShowForgot(false);
-    }
-  });
-  return () => subscription.unsubscribe();
-}, []);
-
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "PASSWORD_RECOVERY") {
-      setShowReset(true);
-      setShowForgot(false);
-    }
-  });
-  return () => subscription.unsubscribe();
-}, []);
+    // Also listen for PASSWORD_RECOVERY event (hash-based flow)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setShowReset(true);
+        setShowForgot(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -145,7 +139,7 @@ function Login() {
     setLoading(false);
   };
 
-  // ── RESET PASSWORD FORM (shown when user clicks email link) ──
+  // ── RESET PASSWORD FORM ──
   if (showReset) {
     return (
       <div className="login-container">
@@ -159,23 +153,9 @@ function Login() {
         ) : (
           <form onSubmit={submitReset} className="login-form">
             {error && <p className="error-msg">{error}</p>}
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Confirm New Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? "Updating..." : "Update Password"}
-            </button>
+            <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+            <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+            <button type="submit" disabled={loading}>{loading ? "Updating..." : "Update Password"}</button>
           </form>
         )}
       </div>
@@ -196,19 +176,11 @@ function Login() {
         ) : (
           <form onSubmit={sendForgotPassword} className="login-form">
             {error && <p className="error-msg">{error}</p>}
-            <input
-              type="email"
-              placeholder="Your Email Address"
-              value={forgotEmail}
-              onChange={(e) => setForgotEmail(e.target.value)}
-              required
-            />
+            <input type="email" placeholder="Your Email Address" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required />
             <button type="submit">Send Reset Link</button>
           </form>
         )}
-        <p className="forgot-link" onClick={() => { setShowForgot(false); setForgotSent(false); setError(""); }}>
-          ← Back to Login
-        </p>
+        <p className="forgot-link" onClick={() => { setShowForgot(false); setForgotSent(false); setError(""); }}>← Back to Login</p>
       </div>
     );
   }
@@ -221,25 +193,13 @@ function Login() {
       {error && <p className="error-msg">{error}</p>}
       <form onSubmit={submit} className="login-form">
         <input
-          name="identifier"
-          type="text"
+          name="identifier" type="text"
           placeholder="Email or Department Code (e.g. APOLLO-ICU)"
-          required
-          onChange={handle}
-          value={form.identifier}
+          required onChange={handle} value={form.identifier}
           style={{ textTransform: form.identifier.includes("@") ? "none" : "uppercase" }}
         />
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          required
-          onChange={handle}
-          value={form.password}
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Signing in..." : "Login"}
-        </button>
+        <input name="password" type="password" placeholder="Password" required onChange={handle} value={form.password} />
+        <button type="submit" disabled={loading}>{loading ? "Signing in..." : "Login"}</button>
       </form>
       <p className="forgot-link" onClick={() => setShowForgot(true)}>Forgot Password?</p>
       <p className="switch-link">
