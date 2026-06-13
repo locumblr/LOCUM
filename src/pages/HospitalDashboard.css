@@ -463,11 +463,28 @@
 }
 
 /* ── RESPONSIVE ── */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .dashboard-header h1 { font-size: 22px; }
   .post-section { flex-direction: column; }
   .post-btn { width: 100%; }
   .form-row { flex-direction: column; }
   .pay-split { flex-direction: column; }
   .qual-dropdown-list { max-height: 200px; }
+  
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 16px !important;
+  }
+
+  .duty-form {
+    padding: 16px;
+  }
+
+  .dashboard-container {
+    padding: 12px 12px 60px;
+  }
 }
