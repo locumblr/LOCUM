@@ -1,6 +1,4 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
-import { supabase } from "./supabaseClient";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -26,14 +24,6 @@ import DepartmentDashboard from "./pages/DepartmentDashboard";
 import DepartmentProfile from "./pages/DepartmentProfile";
 
 function App() {
-  useEffect(() => {
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        window.location.href = "/reset-password";
-      }
-    });
-  }, []);
-
   return (
     <BrowserRouter>
       <Routes>
