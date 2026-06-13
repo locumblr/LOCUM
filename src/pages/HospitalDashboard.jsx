@@ -58,6 +58,51 @@ const emptyForm = { date: "", start_time: "", end_time: "", qualifications: [], 
 const isRadiology = (qualifications) =>
   qualifications.some(q => q.toLowerCase().includes("radio") || q.toLowerCase().includes("pcpndt") || q.toLowerCase().includes("sonolog"));
 
+function QualificationPicker({ qualifications, selected, onAdd, onRemove }) {
+  const [current, setCurrent] = useState("");
+  const available = qualifications.filter(q => !selected.includes(q));
+
+  const handleAdd = () => {
+    if (current && !selected.includes(current)) {
+      onAdd(current);
+      setCurrent("");
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <select
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          style={{ flex: 1, padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, background: "white", boxSizing: "border-box" }}
+        >
+          <option value="">Select a qualification...</option>
+          {available.map(q => <option key={q} value={q}>{q}</option>)}
+        </select>
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!current}
+          style={{ padding: "10px 16px", background: current ? "#1e3a5f" : "#ccc", color: "white", border: "none", borderRadius: 8, cursor: current ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}
+        >
+          + Add
+        </button>
+      </div>
+      {selected.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          {selected.map(q => (
+            <span key={q} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#1e3a5f", color: "white", padding: "5px 12px", borderRadius: 20, fontSize: 13 }}>
+              {q}
+              <button type="button" onClick={() => onRemove(q)} style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HospitalDashboard() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
@@ -71,13 +116,11 @@ function HospitalDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [showQualDropdown, setShowQualDropdown] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [payingDutyId, setPayingDutyId] = useState(null);
 
   useEffect(() => { fetchHospitalData(); }, []);
 
-  // Check for expired locked duties every minute
   useEffect(() => {
     const interval = setInterval(() => {
       if (hospitalId) checkExpiredDuties(hospitalId);
@@ -101,7 +144,6 @@ function HospitalDashboard() {
   };
 
   const checkExpiredDuties = async (uid) => {
-    // Find locked duties older than 4 hours and expire them
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const { data: expiredDuties } = await supabase
       .from("locum_duties")
@@ -109,26 +151,16 @@ function HospitalDashboard() {
       .eq("hospital_id", uid)
       .eq("booking_status", "locked")
       .lt("locked_at", fourHoursAgo);
-
     if (!expiredDuties || expiredDuties.length === 0) return;
-
     for (const duty of expiredDuties) {
-      // Release duty back to open
       await supabase.from("locum_duties").update({
-        booking_status: "expired",
-        booked: false,
-        booked_by: null,
-        locked_at: null,
+        booking_status: "expired", booked: false, booked_by: null, locked_at: null,
       }).eq("id", duty.id);
-
-      // Notify hospital
       await supabase.from("notifications").insert({
         user_id: uid,
         title: "⏰ Duty Expired — Payment Not Received",
-        message: `The ${duty.qualification} duty on ${duty.date} was not confirmed within 4 hours and has expired.`,
+        message: `The ${duty.qualification} duty on ${formatDate(duty.date)} was not confirmed within 4 hours and has expired.`,
       });
-
-      // Notify doctor/nurse
       const staff = duty.doctors || duty.nurses;
       if (staff?.email) {
         await sendEmail({
@@ -138,8 +170,7 @@ function HospitalDashboard() {
             <h1 style="color:#1e3a5f;">LOCUM</h1>
             <h2 style="color:#e74c3c;">⏰ Duty Expired</h2>
             <p>Hi ${staff.first_name},</p>
-            <p>Unfortunately the hospital did not confirm your booking for the <strong>${duty.qualification}</strong> duty on <strong>${duty.date}</strong> within 4 hours.</p>
-            <p>You are now free to book other duties.</p>
+            <p>The hospital did not confirm your <strong>${duty.qualification}</strong> duty on <strong>${formatDate(duty.date)}</strong> within 4 hours. You are now free to book other duties.</p>
             <a href="https://bookmylocum.com/login" style="display:inline-block;padding:14px 28px;background:#1e3a5f;color:white;text-decoration:none;border-radius:8px;margin-top:16px;">Find Other Duties</a>
             <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
           </div>`,
@@ -175,14 +206,12 @@ function HospitalDashboard() {
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const toggleQualification = (q) => {
-    const current = form.qualifications;
-    setForm({ ...form, qualifications: current.includes(q) ? current.filter(x => x !== q) : [...current, q] });
-  };
+  const addQual = (q) => setForm({ ...form, qualifications: [...form.qualifications, q] });
+  const removeQual = (q) => setForm({ ...form, qualifications: form.qualifications.filter(x => x !== q) });
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const submit = async () => {
     if (form.qualifications.length === 0) { alert("Please select at least one qualification."); return; }
+    if (!form.date || !form.start_time || !form.end_time || !form.pay) { alert("Please fill in all required fields."); return; }
     setSubmitting(true);
     const grossPay = parseFloat(form.pay);
     const platformFee = Math.round(grossPay * 0.2);
@@ -205,25 +234,24 @@ function HospitalDashboard() {
           body: {
             qualification: q,
             title: "New Locum Duty Available!",
-            body: `New duty on ${form.date}. Rs.${grossPay.toLocaleString()}`,
+            body: `New duty on ${formatDate(form.date)}. Rs.${grossPay.toLocaleString()}`,
             url: showForm === "nurse" ? "/nurse/dashboard" : "/doctor/dashboard",
           },
         });
       }
       alert("Duty posted successfully!");
-      setForm(emptyForm); setShowForm(null); setShowQualDropdown(false);
+      setForm(emptyForm); setShowForm(null);
       fetchDuties(hospitalId);
     }
     setSubmitting(false);
   };
 
   const cancelLockedDuty = async (duty) => {
-    const confirmed = window.confirm("Cancel this duty? The doctor will be notified and freed to take other duties.");
+    const confirmed = window.confirm("Cancel this duty? The doctor/nurse will be notified and freed to take other duties.");
     if (!confirmed) return;
     await supabase.from("locum_duties").update({
       booking_status: "expired", booked: false, booked_by: null, locked_at: null,
     }).eq("id", duty.id);
-
     const staff = duty.doctors || duty.nurses;
     if (staff?.email) {
       await sendEmail({
@@ -233,8 +261,7 @@ function HospitalDashboard() {
           <h1 style="color:#1e3a5f;">LOCUM</h1>
           <h2 style="color:#e74c3c;">Duty Cancelled</h2>
           <p>Hi ${staff.first_name},</p>
-          <p>The hospital has cancelled the <strong>${duty.qualification}</strong> duty on <strong>${duty.date}</strong>.</p>
-          <p>You are free to book other duties.</p>
+          <p>The hospital has cancelled the <strong>${duty.qualification}</strong> duty on <strong>${formatDate(duty.date)}</strong>. You are free to book other duties.</p>
           <a href="https://bookmylocum.com/login" style="display:inline-block;padding:14px 28px;background:#1e3a5f;color:white;text-decoration:none;border-radius:8px;margin-top:16px;">Find Other Duties</a>
           <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
         </div>`,
@@ -243,7 +270,7 @@ function HospitalDashboard() {
     await supabase.from("notifications").insert({
       user_id: hospitalId,
       title: "Duty Cancelled",
-      message: `The ${duty.qualification} duty on ${duty.date} has been cancelled.`,
+      message: `The ${duty.qualification} duty on ${formatDate(duty.date)} has been cancelled.`,
     });
     fetchDuties(hospitalId);
   };
@@ -253,79 +280,48 @@ function HospitalDashboard() {
     const staff = duty.doctors || duty.nurses;
     const staffType = duty.doctors ? "Doctor" : "Nurse";
     const staffTitle = duty.doctors ? "Dr. " : "";
-
-    // Razorpay integration goes here — for now show payment details
     alert(
       `Platform Fee Payment\n\n` +
-      `Duty: ${duty.qualification} on ${duty.date}\n` +
+      `Duty: ${duty.qualification} on ${formatDate(duty.date)}\n` +
       `${staffType}: ${staffTitle}${staff?.first_name} ${staff?.last_name}\n\n` +
       `Amount: Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST)\n\n` +
       `Payment gateway coming soon. Please contact locum.blr@gmail.com to complete payment and confirm this duty.`
     );
-
-    // TODO: Replace above alert with Razorpay flow
-    // On successful payment, call confirmDutyAfterPayment(duty)
     setPayingDutyId(null);
   };
 
   const confirmDutyAfterPayment = async (duty, paymentId) => {
-    // Called after successful Razorpay payment
     const staff = duty.doctors || duty.nurses;
     const staffType = duty.doctors ? "doctor" : "nurse";
     const staffTitle = duty.doctors ? "Dr. " : "";
-
     await supabase.from("locum_duties").update({
-      booking_status: "confirmed",
-      payment_status: "paid",
-      payment_id: paymentId,
+      booking_status: "confirmed", payment_status: "paid", payment_id: paymentId,
     }).eq("id", duty.id);
-
-    // Send full details to both parties
     const detailsHtml = (recipientName, showHospital) => `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
         <h1 style="color:#1e3a5f;">LOCUM</h1>
         <h2 style="color:#27ae60;">✅ Duty Confirmed!</h2>
         <p>Hi ${recipientName},</p>
-        <p>Your duty has been confirmed. Here are the full details:</p>
         <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-          <tr style="background:#f5f7fa;"><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Date</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${duty.date}</td></tr>
-          <tr><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Time</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${duty.start_time} – ${duty.end_time}</td></tr>
-          <tr style="background:#f5f7fa;"><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Qualification</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${duty.qualification}</td></tr>
-          <tr><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Pay</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">Rs.${(duty.gross_pay || duty.pay).toLocaleString()}</td></tr>
-          ${showHospital ? `<tr style="background:#f5f7fa;"><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Hospital</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${duty.hospitals?.hospital_name || hospitalName}</td></tr>
-          <tr><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Address</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${duty.hospitals?.address || "—"}</td></tr>
-          <tr style="background:#f5f7fa;"><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Contact</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${duty.hospitals?.phone || "—"}</td></tr>` : ""}
-          ${!showHospital ? `<tr style="background:#f5f7fa;"><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">${staffType === "doctor" ? "Doctor" : "Nurse"}</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${staffTitle}${staff?.first_name} ${staff?.last_name}</td></tr>
-          <tr><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Qualification</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${staff?.qualification || "—"}</td></tr>
-          <tr style="background:#f5f7fa;"><td style="padding:10px 14px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Phone</td><td style="padding:10px 14px;border:1px solid #e0e0e0;">${staff?.phone || "—"}</td></tr>` : ""}
+          <tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Date</td><td style="padding:10px;border:1px solid #e0e0e0;">${formatDate(duty.date)}</td></tr>
+          <tr><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Time</td><td style="padding:10px;border:1px solid #e0e0e0;">${duty.start_time} – ${duty.end_time}</td></tr>
+          <tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Qualification</td><td style="padding:10px;border:1px solid #e0e0e0;">${duty.qualification}</td></tr>
+          <tr><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Pay</td><td style="padding:10px;border:1px solid #e0e0e0;">Rs.${(duty.gross_pay || duty.pay).toLocaleString()}</td></tr>
+          ${showHospital ? `<tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Hospital</td><td style="padding:10px;border:1px solid #e0e0e0;">${hospitalName}</td></tr>` : ""}
+          ${!showHospital ? `<tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">${staffType === "doctor" ? "Doctor" : "Nurse"}</td><td style="padding:10px;border:1px solid #e0e0e0;">${staffTitle}${staff?.first_name} ${staff?.last_name}</td></tr>
+          <tr><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Phone</td><td style="padding:10px;border:1px solid #e0e0e0;">${staff?.phone || "—"}</td></tr>` : ""}
         </table>
         <p style="color:#e74c3c;font-size:13px;font-weight:600;">⚠️ This duty cannot be cancelled by either party.</p>
         <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
       </div>
     `;
-
-    // Email to staff (with hospital details)
-    if (staff?.email) {
-      await sendEmail({
-        to: staff.email,
-        subject: "Duty Confirmed — Full Details – LOCUM",
-        html: detailsHtml(`${staffTitle}${staff.first_name}`, true),
-      });
-    }
-
-    // Email to hospital (with staff details)
-    await sendEmail({
-      to: hospitalEmail,
-      subject: "Duty Confirmed — Full Details – LOCUM",
-      html: detailsHtml(hospitalName, false),
-    });
-
+    if (staff?.email) await sendEmail({ to: staff.email, subject: "Duty Confirmed — Full Details – LOCUM", html: detailsHtml(`${staffTitle}${staff.first_name}`, true) });
+    await sendEmail({ to: hospitalEmail, subject: "Duty Confirmed — Full Details – LOCUM", html: detailsHtml(hospitalName, false) });
     await supabase.from("notifications").insert({
       user_id: duty.booked_by,
       title: "✅ Duty Confirmed!",
-      message: `Your ${duty.qualification} duty on ${duty.date} at ${hospitalName} is confirmed. Check your email for full details.`,
+      message: `Your ${duty.qualification} duty on ${formatDate(duty.date)} at ${hospitalName} is confirmed. Check your email for full details.`,
     });
-
     fetchDuties(hospitalId);
   };
 
@@ -334,8 +330,7 @@ function HospitalDashboard() {
   const getTimeRemaining = (lockedAt) => {
     if (!lockedAt) return null;
     const expiry = new Date(new Date(lockedAt).getTime() + 4 * 60 * 60 * 1000);
-    const now = new Date();
-    const diff = expiry - now;
+    const diff = expiry - new Date();
     if (diff <= 0) return "Expiring...";
     const hours = Math.floor(diff / 3600000);
     const mins = Math.floor((diff % 3600000) / 60000);
@@ -401,7 +396,7 @@ function HospitalDashboard() {
       </div>
 
       {showForm && (
-         <div className="duty-form">
+        <div className="duty-form">
           <h2>Post a {showForm === "nurse" ? "Nurse" : "Doctor"} Locum Duty</h2>
           {showForm === "nurse" && (
             <div style={{ background: "#f3e5f5", border: "1px solid #6a0dad", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#4a0080" }}>
@@ -411,11 +406,12 @@ function HospitalDashboard() {
           <div style={{ background: "#e3f2fd", border: "1px solid #1565c0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1565c0" }}>
             ℹ️ Duty goes live immediately. When a doctor/nurse accepts, you'll be notified to pay the platform fee (20% of duty pay) to confirm. You have 4 hours to pay, after which the duty is cancelled.
           </div>
+
+          <div className="form-group">
+            <label>Date</label>
+            <input name="date" type="date" required onChange={handle} value={form.date} style={{ width: "100%", padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }} />
+          </div>
           <div className="form-row">
-            <div className="form-group">
-              <label>Date</label>
-              <input name="date" type="date" required onChange={handle} value={form.date} />
-            </div>
             <div className="form-group">
               <label>Start Time</label>
               <input name="start_time" type="time" required onChange={handle} value={form.start_time} />
@@ -425,6 +421,7 @@ function HospitalDashboard() {
               <input name="end_time" type="time" required onChange={handle} value={form.end_time} />
             </div>
           </div>
+
           <div className="form-group">
             <label>Required Qualifications {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>}</label>
             {isRadiology(form.qualifications) && (
@@ -432,33 +429,14 @@ function HospitalDashboard() {
                 ⚠️ <strong>PCPNDT Notice:</strong> Select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
               </div>
             )}
-            <div className="qual-dropdown-container">
-              <div className="qual-dropdown-trigger" onClick={() => setShowQualDropdown(!showQualDropdown)}>
-                {form.qualifications.length === 0 ? "Select qualifications..." :
-                  form.qualifications.length === 1 ? form.qualifications[0] :
-                  `${form.qualifications.length} qualifications selected`}
-                <span style={{ float: "right" }}>{showQualDropdown ? "▲" : "▼"}</span>
-              </div>
-              {showQualDropdown && (
-  <div className="qual-dropdown-list" style={{ writingMode: "horizontal-tb", direction: "ltr" }}>
-    {(showForm === "nurse" ? nursingQualifications : allQualifications).map((q) => (
-      <label key={q} className={`qual-option ${form.qualifications.includes(q) ? "selected" : ""}`}
-        style={{ writingMode: "horizontal-tb", direction: "ltr", display: "flex", flexDirection: "row" }}>
-        <input type="checkbox" checked={form.qualifications.includes(q)} onChange={() => toggleQualification(q)} />
-        <span style={{ writingMode: "horizontal-tb", direction: "ltr" }}>{q}</span>
-      </label>
-    ))}
-  </div>
-)}
-            </div>
-            {form.qualifications.length > 0 && (
-              <div className="selected-quals">
-                {form.qualifications.map(q => (
-                  <span key={q} className="qual-tag">{q}<button type="button" onClick={() => toggleQualification(q)}>×</button></span>
-                ))}
-              </div>
-            )}
+            <QualificationPicker
+              qualifications={showForm === "nurse" ? nursingQualifications : allQualifications}
+              selected={form.qualifications}
+              onAdd={addQual}
+              onRemove={removeQual}
+            />
           </div>
+
           <div className="form-group">
             <label>Pay to {showForm === "nurse" ? "Nurse" : "Doctor"} (Rs.)</label>
             <input name="pay" placeholder="e.g. 10000" type="number" required onChange={handle} value={form.pay} />
@@ -469,20 +447,22 @@ function HospitalDashboard() {
                   <span>Rs.{parseFloat(form.pay).toLocaleString()}</span>
                 </div>
                 <div className="split-item platform">
-                  <span>🏢 Platform fee (20%, incl. GST) — paid on confirmation</span>
+                  <span>🏢 Platform fee (20%, incl. GST)</span>
                   <span>Rs.{Math.round(parseFloat(form.pay) * 0.2).toLocaleString()}</span>
                 </div>
               </div>
             )}
           </div>
+
           <div className="form-group">
             <label>Additional Notes (optional)</label>
             <textarea name="notes" placeholder="Any special requirements..." onChange={handle} value={form.notes} rows={3} />
           </div>
+
           <button type="button" onClick={submit} className="submit-btn" disabled={submitting}>
             {submitting ? "Posting..." : "Post Duty"}
           </button>
-         </div>
+        </div>
       )}
 
       <h2>Posted Duties</h2>
@@ -496,8 +476,7 @@ function HospitalDashboard() {
             const isConfirmed = duty.booking_status === "confirmed";
             const isExpired = duty.booking_status === "expired";
             return (
-              <div key={duty.id} className={`duty-card ${isConfirmed ? "booked" : isLocked ? "booked" : ""}`}
-                style={{ opacity: isExpired ? 0.6 : 1 }}>
+              <div key={duty.id} className={`duty-card ${isConfirmed || isLocked ? "booked" : ""}`} style={{ opacity: isExpired ? 0.6 : 1 }}>
                 <div className="duty-header">
                   <h3>{duty.qualifications && duty.qualifications.length > 1 ? `${duty.qualifications.length} Qualifications` : duty.qualification}</h3>
                   <span className="pay">Rs.{(duty.gross_pay || duty.pay).toLocaleString()}</span>
@@ -517,7 +496,6 @@ function HospitalDashboard() {
                   )}
                   {duty.notes && <p>📝 {duty.notes}</p>}
 
-                  {/* Show staff details only after confirmed */}
                   {isConfirmed && staff && (
                     <div style={{ marginTop: 10, background: "#e8f5e9", borderRadius: 8, padding: "10px 12px" }}>
                       <p style={{ fontWeight: 700, color: "#2e7d32", marginBottom: 6, fontSize: 13 }}>✅ Confirmed Staff</p>
@@ -527,24 +505,20 @@ function HospitalDashboard() {
                     </div>
                   )}
 
-                  {/* Locked — show pay button */}
-                  {isLocked && staff && (
+                  {isLocked && (
                     <div style={{ marginTop: 10, background: "#fff8e1", borderRadius: 8, padding: "10px 12px" }}>
                       <p style={{ fontWeight: 700, color: "#795500", marginBottom: 6, fontSize: 13 }}>🔒 A {duty.duty_type === "nurse" ? "nurse" : "doctor"} has accepted</p>
-                      <p style={{ fontSize: 13, margin: "2px 0", color: "#888" }}>Pay platform fee to see full details</p>
+                      <p style={{ fontSize: 13, margin: "2px 0", color: "#888" }}>Pay platform fee to confirm and see full details</p>
                       <p style={{ fontSize: 12, color: "#e74c3c", margin: "4px 0" }}>⏰ {getTimeRemaining(duty.locked_at)}</p>
                       <p style={{ fontSize: 13, margin: "4px 0", fontWeight: 600, color: "#1e3a5f" }}>
                         Platform fee: Rs.{(duty.platform_fee || 0).toLocaleString()} (incl. GST)
                       </p>
                       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                        <button
-                          onClick={() => payPlatformFee(duty)}
-                          disabled={payingDutyId === duty.id}
+                        <button onClick={() => payPlatformFee(duty)} disabled={payingDutyId === duty.id}
                           style={{ padding: "10px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                           {payingDutyId === duty.id ? "Processing..." : "💳 Pay & Confirm"}
                         </button>
-                        <button
-                          onClick={() => cancelLockedDuty(duty)}
+                        <button onClick={() => cancelLockedDuty(duty)}
                           style={{ padding: "10px 16px", background: "#fce4ec", color: "#c62828", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                           Cancel
                         </button>
