@@ -58,6 +58,35 @@ const emptyForm = { date: "", start_time: "", end_time: "", qualifications: [], 
 const isRadiology = (qualifications) =>
   qualifications.some(q => q.toLowerCase().includes("radio") || q.toLowerCase().includes("pcpndt") || q.toLowerCase().includes("sonolog"));
 
+const inputStyle = {
+  display: "block",
+  width: "100%",
+  maxWidth: "100%",
+  padding: "10px 12px",
+  border: "1px solid #ddd",
+  borderRadius: 8,
+  fontSize: 16,
+  boxSizing: "border-box",
+  WebkitAppearance: "none",
+  background: "white",
+  fontFamily: "inherit",
+};
+
+const labelStyle = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#555",
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
+  marginBottom: 6,
+};
+
+const fieldStyle = {
+  marginBottom: 16,
+  width: "100%",
+};
+
 function QualificationPicker({ qualifications, selected, onAdd, onRemove }) {
   const [current, setCurrent] = useState("");
   const available = qualifications.filter(q => !selected.includes(q));
@@ -70,12 +99,12 @@ function QualificationPicker({ qualifications, selected, onAdd, onRemove }) {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+    <div style={{ width: "100%" }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", width: "100%" }}>
         <select
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          style={{ flex: 1, padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, background: "white", boxSizing: "border-box" }}
+          style={{ ...inputStyle, flex: 1 }}
         >
           <option value="">Select a qualification...</option>
           {available.map(q => <option key={q} value={q}>{q}</option>)}
@@ -84,7 +113,7 @@ function QualificationPicker({ qualifications, selected, onAdd, onRemove }) {
           type="button"
           onClick={handleAdd}
           disabled={!current}
-          style={{ padding: "10px 16px", background: current ? "#1e3a5f" : "#ccc", color: "white", border: "none", borderRadius: 8, cursor: current ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}
+          style={{ padding: "10px 16px", background: current ? "#1e3a5f" : "#ccc", color: "white", border: "none", borderRadius: 8, cursor: current ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}
         >
           + Add
         </button>
@@ -92,9 +121,9 @@ function QualificationPicker({ qualifications, selected, onAdd, onRemove }) {
       {selected.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           {selected.map(q => (
-            <span key={q} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#1e3a5f", color: "white", padding: "5px 12px", borderRadius: 20, fontSize: 13 }}>
+            <span key={q} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#1e3a5f", color: "white", padding: "5px 12px", borderRadius: 20, fontSize: 13, maxWidth: "100%", wordBreak: "break-word" }}>
               {q}
-              <button type="button" onClick={() => onRemove(q)} style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+              <button type="button" onClick={() => onRemove(q)} style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
             </span>
           ))}
         </div>
@@ -205,7 +234,6 @@ function HospitalDashboard() {
   };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
   const addQual = (q) => setForm({ ...form, qualifications: [...form.qualifications, q] });
   const removeQual = (q) => setForm({ ...form, qualifications: form.qualifications.filter(x => x !== q) });
 
@@ -281,48 +309,9 @@ function HospitalDashboard() {
     const staffType = duty.doctors ? "Doctor" : "Nurse";
     const staffTitle = duty.doctors ? "Dr. " : "";
     alert(
-      `Platform Fee Payment\n\n` +
-      `Duty: ${duty.qualification} on ${formatDate(duty.date)}\n` +
-      `${staffType}: ${staffTitle}${staff?.first_name} ${staff?.last_name}\n\n` +
-      `Amount: Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST)\n\n` +
-      `Payment gateway coming soon. Please contact locum.blr@gmail.com to complete payment and confirm this duty.`
+      `Platform Fee Payment\n\nDuty: ${duty.qualification} on ${formatDate(duty.date)}\n${staffType}: ${staffTitle}${staff?.first_name} ${staff?.last_name}\n\nAmount: Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST)\n\nPayment gateway coming soon. Please contact locum.blr@gmail.com to complete payment and confirm this duty.`
     );
     setPayingDutyId(null);
-  };
-
-  const confirmDutyAfterPayment = async (duty, paymentId) => {
-    const staff = duty.doctors || duty.nurses;
-    const staffType = duty.doctors ? "doctor" : "nurse";
-    const staffTitle = duty.doctors ? "Dr. " : "";
-    await supabase.from("locum_duties").update({
-      booking_status: "confirmed", payment_status: "paid", payment_id: paymentId,
-    }).eq("id", duty.id);
-    const detailsHtml = (recipientName, showHospital) => `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
-        <h1 style="color:#1e3a5f;">LOCUM</h1>
-        <h2 style="color:#27ae60;">✅ Duty Confirmed!</h2>
-        <p>Hi ${recipientName},</p>
-        <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-          <tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Date</td><td style="padding:10px;border:1px solid #e0e0e0;">${formatDate(duty.date)}</td></tr>
-          <tr><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Time</td><td style="padding:10px;border:1px solid #e0e0e0;">${duty.start_time} – ${duty.end_time}</td></tr>
-          <tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Qualification</td><td style="padding:10px;border:1px solid #e0e0e0;">${duty.qualification}</td></tr>
-          <tr><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Pay</td><td style="padding:10px;border:1px solid #e0e0e0;">Rs.${(duty.gross_pay || duty.pay).toLocaleString()}</td></tr>
-          ${showHospital ? `<tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Hospital</td><td style="padding:10px;border:1px solid #e0e0e0;">${hospitalName}</td></tr>` : ""}
-          ${!showHospital ? `<tr style="background:#f5f7fa;"><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">${staffType === "doctor" ? "Doctor" : "Nurse"}</td><td style="padding:10px;border:1px solid #e0e0e0;">${staffTitle}${staff?.first_name} ${staff?.last_name}</td></tr>
-          <tr><td style="padding:10px;border:1px solid #e0e0e0;font-weight:600;color:#1e3a5f;">Phone</td><td style="padding:10px;border:1px solid #e0e0e0;">${staff?.phone || "—"}</td></tr>` : ""}
-        </table>
-        <p style="color:#e74c3c;font-size:13px;font-weight:600;">⚠️ This duty cannot be cancelled by either party.</p>
-        <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
-      </div>
-    `;
-    if (staff?.email) await sendEmail({ to: staff.email, subject: "Duty Confirmed — Full Details – LOCUM", html: detailsHtml(`${staffTitle}${staff.first_name}`, true) });
-    await sendEmail({ to: hospitalEmail, subject: "Duty Confirmed — Full Details – LOCUM", html: detailsHtml(hospitalName, false) });
-    await supabase.from("notifications").insert({
-      user_id: duty.booked_by,
-      title: "✅ Duty Confirmed!",
-      message: `Your ${duty.qualification} duty on ${formatDate(duty.date)} at ${hospitalName} is confirmed. Check your email for full details.`,
-    });
-    fetchDuties(hospitalId);
   };
 
   const logout = async () => { await supabase.auth.signOut(); navigate("/"); };
@@ -346,84 +335,97 @@ function HospitalDashboard() {
   };
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 60px" }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, paddingTop: 16, flexWrap: "wrap", gap: 16 }}>
         <div>
-          <h1>Hospital Dashboard</h1>
-          {hospitalName && <p style={{ color: "#888", fontSize: 14 }}>{hospitalName}</p>}
+          <h1 style={{ color: "#1e3a5f", fontSize: 28, fontWeight: 700, margin: 0 }}>Hospital Dashboard</h1>
+          {hospitalName && <p style={{ color: "#888", fontSize: 14, margin: "4px 0 0" }}>{hospitalName}</p>}
         </div>
-        <div className="header-buttons">
-          <button onClick={() => navigate("/hospital/locums")}>My Locums</button>
-          <button onClick={() => navigate("/hospital/profile")}>Profile</button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={() => navigate("/hospital/locums")} style={{ padding: "10px 20px", border: "none", borderRadius: 8, background: "#1e3a5f", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 500 }}>My Locums</button>
+          <button onClick={() => navigate("/hospital/profile")} style={{ padding: "10px 20px", border: "none", borderRadius: 8, background: "#1e3a5f", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 500 }}>Profile</button>
           <div style={{ position: "relative" }}>
-            <button className="menu-btn" onClick={() => setShowMenu(!showMenu)}>
-              {unreadCount > 0 && <span className="notif-dot" />}⋮
+            <button onClick={() => setShowMenu(!showMenu)} style={{ position: "relative", padding: "10px 16px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>
+              {unreadCount > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, background: "#e74c3c", borderRadius: "50%" }} />}
+              ⋮
             </button>
             {showMenu && (
-              <div className="dropdown-menu">
-                <button onClick={() => { setShowNotifications(!showNotifications); markAllRead(); setShowMenu(false); }}>
-                  🔔 Notifications {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+              <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "white", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", zIndex: 200, minWidth: 180, overflow: "hidden" }}>
+                <button onClick={() => { setShowNotifications(!showNotifications); markAllRead(); setShowMenu(false); }} style={{ width: "100%", padding: "14px 18px", background: "none", border: "none", textAlign: "left", fontSize: 14, color: "#333", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}>
+                  🔔 Notifications {unreadCount > 0 && <span style={{ background: "#e74c3c", color: "white", borderRadius: 20, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>{unreadCount}</span>}
                 </button>
-                <button onClick={() => { navigate("/help"); setShowMenu(false); }}>❓ Help</button>
-                <button className="logout-item" onClick={logout}>🚪 Logout</button>
+                <button onClick={() => { navigate("/help"); setShowMenu(false); }} style={{ width: "100%", padding: "14px 18px", background: "none", border: "none", textAlign: "left", fontSize: 14, color: "#333", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}>❓ Help</button>
+                <button onClick={logout} style={{ width: "100%", padding: "14px 18px", background: "none", border: "none", textAlign: "left", fontSize: 14, color: "#e74c3c", cursor: "pointer" }}>🚪 Logout</button>
               </div>
             )}
           </div>
         </div>
       </div>
 
+      {/* Notifications */}
       {showNotifications && (
-        <div className="notifications-panel">
-          <h3>🔔 Notifications</h3>
-          {notifications.length === 0 ? <p className="no-notif">No notifications yet</p> :
+        <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 24, boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}>
+          <h3 style={{ color: "#1e3a5f", marginBottom: 16, fontSize: 16 }}>🔔 Notifications</h3>
+          {notifications.length === 0 ? <p style={{ color: "#888", fontSize: 14 }}>No notifications yet</p> :
             notifications.map(n => (
-              <div key={n.id} className={`notif-item ${n.read ? "read" : "unread"}`}>
-                <p className="notif-title">{n.title}</p>
-                <p className="notif-message">{n.message}</p>
-                <p className="notif-time">{new Date(n.created_at).toLocaleDateString()}</p>
+              <div key={n.id} style={{ padding: "12px 0", borderBottom: "1px solid #f0f0f0", borderLeft: n.read ? "none" : "3px solid #1e3a5f", paddingLeft: n.read ? 0 : 10 }}>
+                <p style={{ fontWeight: 600, color: "#1e3a5f", fontSize: 14, marginBottom: 4 }}>{n.title}</p>
+                <p style={{ color: "#555", fontSize: 13, marginBottom: 4, lineHeight: 1.5 }}>{n.message}</p>
+                <p style={{ color: "#aaa", fontSize: 12 }}>{new Date(n.created_at).toLocaleDateString()}</p>
               </div>
             ))}
         </div>
       )}
 
-      <div className="post-section">
-        <button className="post-btn" onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); setForm(emptyForm); }}>
+      {/* Post Buttons */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 32, flexDirection: "column" }}>
+        <button onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); setForm(emptyForm); }}
+          style={{ padding: "16px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
           {showForm === "doctor" ? "Cancel" : "+ Post Doctor Locum"}
         </button>
-        <button className="post-btn nurse-btn" onClick={() => { setShowForm(showForm === "nurse" ? null : "nurse"); setForm(emptyForm); }}>
+        <button onClick={() => { setShowForm(showForm === "nurse" ? null : "nurse"); setForm(emptyForm); }}
+          style={{ padding: "16px 20px", background: "#6a0dad", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
           {showForm === "nurse" ? "Cancel" : "+ Post Nurse Locum"}
         </button>
       </div>
 
+      {/* Post Form */}
       {showForm && (
-        <div className="duty-form">
-          <h2>Post a {showForm === "nurse" ? "Nurse" : "Doctor"} Locum Duty</h2>
+        <div style={{ background: "white", borderRadius: 16, padding: "20px 16px", marginBottom: 32, boxShadow: "0 2px 16px rgba(0,0,0,0.08)", width: "100%", boxSizing: "border-box" }}>
+          <h2 style={{ color: "#1e3a5f", marginBottom: 20, fontSize: 20 }}>Post a {showForm === "nurse" ? "Nurse" : "Doctor"} Locum Duty</h2>
+
           {showForm === "nurse" && (
             <div style={{ background: "#f3e5f5", border: "1px solid #6a0dad", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#4a0080" }}>
               💜 You are posting a <strong>Nurse Locum</strong> duty
             </div>
           )}
+
           <div style={{ background: "#e3f2fd", border: "1px solid #1565c0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1565c0" }}>
             ℹ️ Duty goes live immediately. When a doctor/nurse accepts, you'll be notified to pay the platform fee (20% of duty pay) to confirm. You have 4 hours to pay, after which the duty is cancelled.
           </div>
 
-          <div className="form-group">
-            <label>Date</label>
-            <input name="date" type="date" required onChange={handle} value={form.date} style={{ width: "100%", padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }} />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Start Time</label>
-              <input name="start_time" type="time" required onChange={handle} value={form.start_time} />
-            </div>
-            <div className="form-group">
-              <label>End Time</label>
-              <input name="end_time" type="time" required onChange={handle} value={form.end_time} />
-            </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Date</label>
+            <input name="date" type="date" required onChange={handle} value={form.date} style={inputStyle} />
           </div>
 
-          <div className="form-group">
-            <label>Required Qualifications {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13 }}>({form.qualifications.length} selected)</span>}</label>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Start Time</label>
+            <input name="start_time" type="time" required onChange={handle} value={form.start_time} style={inputStyle} />
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>End Time</label>
+            <input name="end_time" type="time" required onChange={handle} value={form.end_time} style={inputStyle} />
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Required Qualifications{" "}
+              {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13, textTransform: "none" }}>({form.qualifications.length} selected)</span>}
+            </label>
             {isRadiology(form.qualifications) && (
               <div style={{ background: "#fff8e1", border: "1px solid #ffcc02", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#795500", marginBottom: 8 }}>
                 ⚠️ <strong>PCPNDT Notice:</strong> Select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
@@ -437,16 +439,16 @@ function HospitalDashboard() {
             />
           </div>
 
-          <div className="form-group">
-            <label>Pay to {showForm === "nurse" ? "Nurse" : "Doctor"} (Rs.)</label>
-            <input name="pay" placeholder="e.g. 10000" type="number" required onChange={handle} value={form.pay} />
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Pay to {showForm === "nurse" ? "Nurse" : "Doctor"} (Rs.)</label>
+            <input name="pay" type="number" placeholder="e.g. 10000" required onChange={handle} value={form.pay} style={inputStyle} />
             {form.pay && parseFloat(form.pay) > 0 && (
-              <div className="pay-split">
-                <div className="split-item doctor">
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ background: "#e8f5e9", color: "#2e7d32", padding: "10px 14px", borderRadius: 8, fontSize: 13, display: "flex", justifyContent: "space-between" }}>
                   <span>👨‍⚕️ {showForm === "nurse" ? "Nurse" : "Doctor"} receives</span>
                   <span>Rs.{parseFloat(form.pay).toLocaleString()}</span>
                 </div>
-                <div className="split-item platform">
+                <div style={{ background: "#e3f2fd", color: "#1565c0", padding: "10px 14px", borderRadius: 8, fontSize: 13, display: "flex", justifyContent: "space-between" }}>
                   <span>🏢 Platform fee (20%, incl. GST)</span>
                   <span>Rs.{Math.round(parseFloat(form.pay) * 0.2).toLocaleString()}</span>
                 </div>
@@ -454,21 +456,23 @@ function HospitalDashboard() {
             )}
           </div>
 
-          <div className="form-group">
-            <label>Additional Notes (optional)</label>
-            <textarea name="notes" placeholder="Any special requirements..." onChange={handle} value={form.notes} rows={3} />
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Additional Notes (optional)</label>
+            <textarea name="notes" placeholder="Any special requirements..." onChange={handle} value={form.notes} rows={3} style={inputStyle} />
           </div>
 
-          <button type="button" onClick={submit} className="submit-btn" disabled={submitting}>
+          <button type="button" onClick={submit} disabled={submitting}
+            style={{ width: "100%", padding: 14, background: submitting ? "#aaa" : "#1e3a5f", color: "white", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer", marginTop: 8 }}>
             {submitting ? "Posting..." : "Post Duty"}
           </button>
         </div>
       )}
 
-      <h2>Posted Duties</h2>
+      {/* Posted Duties */}
+      <h2 style={{ color: "#1e3a5f", fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Posted Duties</h2>
       {loading ? <p style={{ color: "#888" }}>Loading...</p> :
-        duties.length === 0 ? <p className="empty-msg">No duties posted yet.</p> : (
-        <div className="duties-grid">
+        duties.length === 0 ? <p style={{ color: "#888", textAlign: "center", padding: "40px 20px" }}>No duties posted yet.</p> : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
           {duties.map((duty) => {
             const staff = duty.doctors || duty.nurses;
             const staffTitle = duty.doctors ? "Dr. " : "";
@@ -476,14 +480,18 @@ function HospitalDashboard() {
             const isConfirmed = duty.booking_status === "confirmed";
             const isExpired = duty.booking_status === "expired";
             return (
-              <div key={duty.id} className={`duty-card ${isConfirmed || isLocked ? "booked" : ""}`} style={{ opacity: isExpired ? 0.6 : 1 }}>
-                <div className="duty-header">
-                  <h3>{duty.qualifications && duty.qualifications.length > 1 ? `${duty.qualifications.length} Qualifications` : duty.qualification}</h3>
-                  <span className="pay">Rs.{(duty.gross_pay || duty.pay).toLocaleString()}</span>
+              <div key={duty.id} style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", opacity: isExpired ? 0.6 : 1, borderLeft: isConfirmed || isLocked ? "4px solid #f39c12" : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 10 }}>
+                  <h3 style={{ color: "#1e3a5f", fontSize: 15, fontWeight: 600, flex: 1, lineHeight: 1.4, margin: 0 }}>
+                    {duty.qualifications && duty.qualifications.length > 1 ? `${duty.qualifications.length} Qualifications` : duty.qualification}
+                  </h3>
+                  <span style={{ background: "#e8f5e9", color: "#2e7d32", padding: "4px 10px", borderRadius: 20, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" }}>
+                    Rs.{(duty.gross_pay || duty.pay).toLocaleString()}
+                  </span>
                 </div>
-                <div className="duty-details">
-                  <p>📅 {formatDate(duty.date)}</p>
-                  <p>🕐 {duty.start_time} - {duty.end_time}</p>
+                <div>
+                  <p style={{ color: "#555", fontSize: 14, marginBottom: 6 }}>📅 {formatDate(duty.date)}</p>
+                  <p style={{ color: "#555", fontSize: 14, marginBottom: 6 }}>🕐 {duty.start_time} - {duty.end_time}</p>
                   {duty.duty_type === "nurse" && (
                     <span style={{ background: "#f3e5f5", color: "#6a0dad", padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>Nurse Duty</span>
                   )}
@@ -494,7 +502,7 @@ function HospitalDashboard() {
                       ))}
                     </div>
                   )}
-                  {duty.notes && <p>📝 {duty.notes}</p>}
+                  {duty.notes && <p style={{ color: "#555", fontSize: 14, marginBottom: 6 }}>📝 {duty.notes}</p>}
 
                   {isConfirmed && staff && (
                     <div style={{ marginTop: 10, background: "#e8f5e9", borderRadius: 8, padding: "10px 12px" }}>
@@ -510,9 +518,7 @@ function HospitalDashboard() {
                       <p style={{ fontWeight: 700, color: "#795500", marginBottom: 6, fontSize: 13 }}>🔒 A {duty.duty_type === "nurse" ? "nurse" : "doctor"} has accepted</p>
                       <p style={{ fontSize: 13, margin: "2px 0", color: "#888" }}>Pay platform fee to confirm and see full details</p>
                       <p style={{ fontSize: 12, color: "#e74c3c", margin: "4px 0" }}>⏰ {getTimeRemaining(duty.locked_at)}</p>
-                      <p style={{ fontSize: 13, margin: "4px 0", fontWeight: 600, color: "#1e3a5f" }}>
-                        Platform fee: Rs.{(duty.platform_fee || 0).toLocaleString()} (incl. GST)
-                      </p>
+                      <p style={{ fontSize: 13, margin: "4px 0", fontWeight: 600, color: "#1e3a5f" }}>Platform fee: Rs.{(duty.platform_fee || 0).toLocaleString()} (incl. GST)</p>
                       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                         <button onClick={() => payPlatformFee(duty)} disabled={payingDutyId === duty.id}
                           style={{ padding: "10px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
