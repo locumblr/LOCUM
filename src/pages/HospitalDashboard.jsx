@@ -215,7 +215,7 @@ function HospitalDashboard() {
     console.log("Fetching duties for uid:", uid);
     const { data, error } = await supabase
       .from("locum_duties")
-      .select("*, doctors(first_name, last_name, qualification, phone, email), nurses(first_name, last_name, qualification, phone, email)")
+     .select("*, doctors(first_name, last_name, qualification, phone, email)")
       .eq("hospital_id", uid)
       .eq("completed", false)
       .order("created_at", { ascending: false });
