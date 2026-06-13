@@ -176,7 +176,7 @@ function HospitalDashboard() {
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const { data: expiredDuties } = await supabase
       .from("locum_duties")
-      .select("*, doctors(first_name, last_name, email), nurses(first_name, last_name, email)")
+      .select("*, doctors(first_name, last_name, qualification, phone, email)")
       .eq("hospital_id", uid)
       .eq("booking_status", "locked")
       .lt("locked_at", fourHoursAgo);
