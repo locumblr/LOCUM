@@ -44,8 +44,22 @@ function HospitalLocums() {
   const verifyBooking = async (dutyId) => {
     const confirmed = window.confirm("Confirm credentials verified and approve for this duty?");
     if (!confirmed) return;
-    await supabase.from("locum_duties").update({ booking_status: "confirmed" }).eq("id", dutyId);
-    alert("Professional confirmed!");
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("https://xdadenailnapeskzacyt.supabase.co/functions/v1/confirm-payment", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token}`,
+        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYWRlbmFpbG5hcGVza3phY3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzYyNDAsImV4cCI6MjA5MzU1MjI0MH0.RCYJXt6iyoRRRU_b7Ku_OeZIFtXLZGIKloVnSSvKddY",
+      },
+      body: JSON.stringify({ duty_id: dutyId, payment_ref: "MANUAL" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert("Error confirming duty: " + (err.error || "Please try again."));
+      return;
+    }
+    alert("Professional confirmed! Invoice emailed to hospital.");
     fetchDuties();
   };
 
