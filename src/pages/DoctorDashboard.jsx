@@ -3,6 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import "./DoctorDashboard.css";
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const monthName = date.toLocaleString("default", { month: "long" });
+  const suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+  return `${monthName} ${day}${suffix}, ${year}`;
+};
+
 function DoctorDashboard() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
@@ -73,6 +82,7 @@ function DoctorDashboard() {
       .eq("booked", false)
       .eq("completed", false)
       .eq("booking_status", "open")
+      .gte("date", new Date().toISOString().split("T")[0])
       .order("date", { ascending: true });
     if (!error) setDuties(data || []);
     setLoading(false);
@@ -221,7 +231,7 @@ function DoctorDashboard() {
                 </div>
                 <div className="duty-details">
                   <p>📍 {cr.locum_duties?.hospitals?.area || "—"}</p>
-                  <p>📅 {cr.locum_duties?.date}</p>
+                  <p>📅 {formatDate(cr.locum_duties?.date)}</p>
                   <p>🕐 {cr.locum_duties?.start_time} - {cr.locum_duties?.end_time}</p>
                   <p>🎓 {cr.locum_duties?.qualification}</p>
                   <p style={{ fontSize: 13, color: "#888" }}>Requested by Dr. {cr.doctors?.first_name} {cr.doctors?.last_name}</p>
@@ -265,7 +275,7 @@ function DoctorDashboard() {
                   <span className="pay">Rs.{(duty.gross_pay || duty.pay).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
-                  <p>📅 {duty.date}</p>
+                  <p>📅 {formatDate(duty.date)}</p>
                   <p>🕐 {duty.start_time} - {duty.end_time}</p>
                   <p>🎓 {duty.qualification}</p>
                   {duty.notes && <p>📝 {duty.notes}</p>}
