@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import PWAUpdatePrompt from "./PWAUpdatePrompt";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -28,6 +29,7 @@ import DepartmentProfile from "./pages/DepartmentProfile";
 function App() {
   return (
     <BrowserRouter>
+      <PWAUpdatePrompt />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/app" element={<Home />} />

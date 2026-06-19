@@ -6,11 +6,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      devOptions: { enabled: true },
+      registerType: 'prompt',
+      devOptions: { enabled: false },
       workbox: {
         cleanupOutdatedCaches: true,
-        skipWaiting: true,
         clientsClaim: true,
       },
       includeAssets: ['favicon.svg', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
