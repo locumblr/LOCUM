@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PWAUpdatePrompt from "./PWAUpdatePrompt";
+import SplashScreen from "./SplashScreen";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -27,6 +29,10 @@ import DepartmentDashboard from "./pages/DepartmentDashboard";
 import DepartmentProfile from "./pages/DepartmentProfile";
 
 function App() {
+  const [splashDone, setSplashDone] = useState(false);
+
+  if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
+
   return (
     <BrowserRouter>
       <PWAUpdatePrompt />
