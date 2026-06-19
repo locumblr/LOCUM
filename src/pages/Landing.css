@@ -126,7 +126,6 @@
 .hero-logo {
   width: 180px;
   margin-bottom: 32px;
-  filter: brightness(0) invert(1);
 }
 
 .hero h1 {
