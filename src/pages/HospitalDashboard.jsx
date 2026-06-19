@@ -135,6 +135,23 @@ const fieldStyle = {
   width: "100%",
 };
 
+const CONSULTATION_SPECIALTIES = [
+  "Rheumatology", "Haematology", "Medical Oncology", "Surgical Oncology",
+  "Nephrology", "Gastroenterology", "Hepatology", "Endocrinology",
+  "Neurology", "Pulmonology", "Infectious Disease", "Clinical Immunology",
+  "Neonatology", "Paediatric Cardiology", "Geriatrics", "Palliative Care",
+  "Psychiatry", "Dermatology", "Allergy & Immunology", "Clinical Genetics",
+];
+
+const CONSULT_SLOTS = ["Morning (8am–12pm)", "Afternoon (12pm–5pm)", "Evening (5pm–8pm)"];
+const SLOT_TIMES = {
+  "Morning (8am–12pm)": { start_time: "08:00", end_time: "12:00" },
+  "Afternoon (12pm–5pm)": { start_time: "12:00", end_time: "17:00" },
+  "Evening (5pm–8pm)": { start_time: "17:00", end_time: "20:00" },
+};
+
+const emptyConsultForm = { qualification: "", date: "", slot: "", pay: "", notes: "" };
+
 function QualificationPicker({ qualifications, selected, onAdd, onRemove }) {
   const [current, setCurrent] = useState("");
   const available = qualifications.filter(q => !selected.includes(q));
@@ -195,6 +212,9 @@ function HospitalDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [payingDutyId, setPayingDutyId] = useState(null);
+  const [showConsultForm, setShowConsultForm] = useState(false);
+  const [consultForm, setConsultForm] = useState(emptyConsultForm);
+  const [submittingConsult, setSubmittingConsult] = useState(false);
 
   useEffect(() => { fetchHospitalData(); }, []);
 
@@ -326,6 +346,48 @@ function HospitalDashboard() {
     setSubmitting(false);
   };
 
+  const handleConsult = (e) => setConsultForm({ ...consultForm, [e.target.name]: e.target.value });
+
+  const submitConsult = async () => {
+    if (!consultForm.qualification) { alert("Please select a specialty."); return; }
+    if (!consultForm.date || !consultForm.slot || !consultForm.pay) { alert("Please fill in all required fields."); return; }
+    setSubmittingConsult(true);
+    const perConsultPay = parseFloat(consultForm.pay);
+    const grossPay = perConsultPay * 3;
+    const platformFee = Math.round(grossPay * 0.2);
+    const { start_time, end_time } = SLOT_TIMES[consultForm.slot];
+    const { error } = await supabase.from("locum_duties").insert({
+      hospital_id: hospitalId,
+      duty_type: "consultation",
+      qualification: consultForm.qualification,
+      qualifications: [consultForm.qualification],
+      date: consultForm.date,
+      start_time, end_time,
+      pay: perConsultPay,
+      gross_pay: grossPay,
+      platform_fee: platformFee,
+      notes: consultForm.notes,
+      booked: false, completed: false, booking_status: "open", payment_status: "unpaid",
+    });
+    if (error) {
+      alert("Error posting consultation: " + error.message);
+    } else {
+      await supabase.functions.invoke("send-push", {
+        body: {
+          qualification: consultForm.qualification,
+          title: "New Consultation Request!",
+          body: `In-patient ${consultForm.qualification} consultation on ${formatDate(consultForm.date)}. Rs.${grossPay.toLocaleString()} (3 sessions)`,
+          url: "/doctor/dashboard",
+        },
+      });
+      alert("Consultation posted successfully!");
+      setConsultForm(emptyConsultForm);
+      setShowConsultForm(false);
+      fetchDuties(hospitalId);
+    }
+    setSubmittingConsult(false);
+  };
+
   const cancelLockedDuty = async (duty) => {
     const confirmed = window.confirm("Cancel this duty? The doctor/nurse will be notified and freed to take other duties.");
     if (!confirmed) return;
@@ -433,15 +495,83 @@ function HospitalDashboard() {
 
       {/* Post Buttons */}
       <div style={{ display: "flex", gap: 12, marginBottom: 32, flexDirection: "column" }}>
-        <button onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); setForm(emptyForm); }}
+        <button onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); setForm(emptyForm); setShowConsultForm(false); }}
           style={{ padding: "16px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
           {showForm === "doctor" ? "Cancel" : "+ Post Doctor Locum"}
         </button>
-        <button onClick={() => { setShowForm(showForm === "nurse" ? null : "nurse"); setForm(emptyForm); }}
+        <button onClick={() => { setShowForm(showForm === "nurse" ? null : "nurse"); setForm(emptyForm); setShowConsultForm(false); }}
           style={{ padding: "16px 20px", background: "#6a0dad", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
           {showForm === "nurse" ? "Cancel" : "+ Post Nurse Locum"}
         </button>
+        <button onClick={() => { setShowConsultForm(!showConsultForm); setShowForm(null); setConsultForm(emptyConsultForm); }}
+          style={{ padding: "16px 20px", background: "#1565c0", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
+          {showConsultForm ? "Cancel" : "+ Post Specialist Consultation"}
+        </button>
       </div>
+
+      {/* Consultation Form */}
+      {showConsultForm && (
+        <div style={{ background: "white", borderRadius: 16, padding: "20px 16px", marginBottom: 32, boxShadow: "0 2px 16px rgba(0,0,0,0.08)", width: "100%", boxSizing: "border-box" }}>
+          <h2 style={{ color: "#1565c0", marginBottom: 8, fontSize: 20 }}>Post a Specialist Consultation</h2>
+          <div style={{ background: "#e3f2fd", border: "1px solid #1565c0", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1565c0" }}>
+            🏥 For admitted in-patients needing a specialist opinion. Minimum 3 sessions: initial consult, review with investigations, and discharge advice.
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Specialty Required</label>
+            <select name="qualification" value={consultForm.qualification} onChange={handleConsult} style={inputStyle}>
+              <option value="">Select a specialty...</option>
+              {CONSULTATION_SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Date of First Consultation</label>
+            <input name="date" type="date" value={consultForm.date} onChange={handleConsult} style={inputStyle} />
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Preferred Time Slot</label>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {CONSULT_SLOTS.map(slot => (
+                <button key={slot} type="button" onClick={() => setConsultForm({ ...consultForm, slot })}
+                  style={{ padding: "10px 18px", borderRadius: 8, border: `2px solid ${consultForm.slot === slot ? "#1565c0" : "#ddd"}`,
+                    background: consultForm.slot === slot ? "#1565c0" : "white", color: consultForm.slot === slot ? "white" : "#333",
+                    fontWeight: consultForm.slot === slot ? 700 : 400, cursor: "pointer", fontSize: 14 }}>
+                  {slot}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Fee per Consultation (Rs.)</label>
+            <input name="pay" type="number" placeholder="e.g. 2000" value={consultForm.pay} onChange={handleConsult} style={inputStyle} />
+            {consultForm.pay && parseFloat(consultForm.pay) > 0 && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ background: "#e8f5e9", color: "#2e7d32", padding: "10px 14px", borderRadius: 8, fontSize: 13, display: "flex", justifyContent: "space-between" }}>
+                  <span>👨‍⚕️ Specialist receives (total 3 sessions)</span>
+                  <span>Rs.{(parseFloat(consultForm.pay) * 3).toLocaleString()}</span>
+                </div>
+                <div style={{ background: "#e3f2fd", color: "#1565c0", padding: "10px 14px", borderRadius: 8, fontSize: 13, display: "flex", justifyContent: "space-between" }}>
+                  <span>🏢 Platform fee (20%, incl. GST)</span>
+                  <span>Rs.{Math.round(parseFloat(consultForm.pay) * 3 * 0.2).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Additional Notes (optional)</label>
+            <textarea name="notes" placeholder="e.g. Patient has lupus nephritis, admitted for 5 days..." value={consultForm.notes} onChange={handleConsult} rows={3} style={inputStyle} />
+          </div>
+
+          <button type="button" onClick={submitConsult} disabled={submittingConsult}
+            style={{ width: "100%", padding: 14, background: submittingConsult ? "#aaa" : "#1565c0", color: "white", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: submittingConsult ? "not-allowed" : "pointer", marginTop: 8 }}>
+            {submittingConsult ? "Posting..." : "Post Consultation Request"}
+          </button>
+        </div>
+      )}
 
       {/* Post Form */}
       {showForm && (

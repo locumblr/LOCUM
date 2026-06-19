@@ -26,6 +26,10 @@ function DoctorDashboard() {
   const [searchLocation, setSearchLocation] = useState("");
   const [showMenu, setShowMenu] = useState(false);
   const [myLockedDuty, setMyLockedDuty] = useState(null);
+  const [activeTab, setActiveTab] = useState("locum");
+  const [consultations, setConsultations] = useState([]);
+  const [consultLoading, setConsultLoading] = useState(false);
+  const [bookingConsult, setBookingConsult] = useState(null);
 
   useEffect(() => { fetchDoctorData(); }, []);
 
@@ -42,6 +46,7 @@ function DoctorDashboard() {
     setDoctorName(`${doctor.first_name} ${doctor.last_name}`);
     setDoctorQualification(doctor.qualification);
     fetchDuties(doctor.qualification, user.id);
+    fetchConsultations(doctor.qualification, user.id);
     fetchCoverRequests(doctor.qualification, user.id);
     fetchMyLockedDuty(user.id);
     subscribeToPush(doctor.qualification, user.id);
@@ -79,6 +84,7 @@ function DoctorDashboard() {
       .from("locum_duties")
       .select("*, hospitals(hospital_name, area, address)")
       .or(`qualification.eq.${qualification},qualifications.cs.{${qualification}}`)
+      .neq("duty_type", "consultation")
       .eq("booked", false)
       .eq("completed", false)
       .eq("booking_status", "open")
@@ -86,6 +92,29 @@ function DoctorDashboard() {
       .order("date", { ascending: true });
     if (!error) setDuties(data || []);
     setLoading(false);
+  };
+
+  const fetchConsultations = async (qualification, uid) => {
+    setConsultLoading(true);
+    const { data, error } = await supabase
+      .from("locum_duties")
+      .select("*, hospitals(hospital_name, area, address)")
+      .eq("duty_type", "consultation")
+      .or(`qualification.eq.${qualification},qualifications.cs.{${qualification}}`)
+      .eq("booked", false)
+      .eq("completed", false)
+      .eq("booking_status", "open")
+      .gte("date", new Date().toISOString().split("T")[0])
+      .order("date", { ascending: true });
+    if (!error) setConsultations(data || []);
+    setConsultLoading(false);
+  };
+
+  const getSlotLabel = (startTime) => {
+    if (!startTime) return "";
+    if (startTime < "12:00") return "Morning (8am–12pm)";
+    if (startTime < "17:00") return "Afternoon (12pm–5pm)";
+    return "Evening (5pm–8pm)";
   };
 
   const fetchCoverRequests = async (qualification, userId) => {
@@ -135,6 +164,37 @@ function DoctorDashboard() {
     fetchDuties(doctorQualification, doctorId);
     fetchMyLockedDuty(user.id);
     setBooking(null);
+  };
+
+  const bookConsultation = async (duty) => {
+    const perConsult = duty.pay || 0;
+    const total = duty.gross_pay || perConsult * 3;
+    const confirmed = window.confirm(
+      `Accept this ${duty.qualification} consultation at ${duty.hospitals?.area || "the hospital"} on ${formatDate(duty.date)}?\n\nThis covers 3 consultations:\n1. Initial consult\n2. Review with investigations\n3. Discharge advice\n\nPer consult: Rs.${perConsult.toLocaleString()} | Total: Rs.${total.toLocaleString()}\n\nThe hospital will be notified to pay the platform fee within 4 hours.`
+    );
+    if (!confirmed) return;
+    setBookingConsult(duty.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: latest } = await supabase.from("locum_duties").select("booked, booking_status").eq("id", duty.id).single();
+    if (latest?.booked || latest?.booking_status !== "open") {
+      alert("Sorry, this consultation was just taken by someone else!");
+      setBookingConsult(null);
+      fetchConsultations(doctorQualification, doctorId);
+      return;
+    }
+    const { error } = await supabase.from("locum_duties")
+      .update({ booked: true, booked_by: user.id, booking_status: "locked", locked_at: new Date().toISOString() })
+      .eq("id", duty.id).eq("booked", false);
+    if (error) { alert("Error accepting consultation: " + error.message); setBookingConsult(null); return; }
+    await supabase.from("notifications").insert({
+      user_id: duty.hospital_id,
+      title: "🔒 Consultation Accepted — Pay to Confirm",
+      message: `Dr. ${doctorName} has accepted the ${duty.qualification} consultation on ${formatDate(duty.date)} (3 sessions). Pay the platform fee of Rs.${(duty.platform_fee || 0).toLocaleString()} within 4 hours to confirm.`,
+    });
+    alert("Consultation accepted! Waiting for hospital to confirm payment. You'll be notified once confirmed.");
+    fetchConsultations(doctorQualification, doctorId);
+    fetchMyLockedDuty(user.id);
+    setBookingConsult(null);
   };
 
   const acceptCover = async (coverRequest) => {
@@ -245,9 +305,19 @@ function DoctorDashboard() {
         </div>
       )}
 
-      <h2>Available Locum Duties</h2>
-      {doctorQualification && <p className="subtitle">Showing duties for: <strong>{doctorQualification}</strong></p>}
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "2px solid #eee" }}>
+        <button onClick={() => setActiveTab("locum")}
+          style={{ padding: "10px 22px", border: "none", background: "none", cursor: "pointer", fontSize: 15, fontWeight: activeTab === "locum" ? 700 : 400, color: activeTab === "locum" ? "#1e3a5f" : "#888", borderBottom: activeTab === "locum" ? "3px solid #1e3a5f" : "3px solid transparent", marginBottom: -2 }}>
+          Locum Duties
+        </button>
+        <button onClick={() => setActiveTab("consultation")}
+          style={{ padding: "10px 22px", border: "none", background: "none", cursor: "pointer", fontSize: 15, fontWeight: activeTab === "consultation" ? 700 : 400, color: activeTab === "consultation" ? "#1e3a5f" : "#888", borderBottom: activeTab === "consultation" ? "3px solid #1e3a5f" : "3px solid transparent", marginBottom: -2 }}>
+          In-Patient Consultations
+        </button>
+      </div>
 
+      {activeTab === "locum" && <>
       <div className="filter-bar">
         <div className="filter-group">
           <label className="filter-label">📅 Filter by Date</label>
@@ -289,6 +359,41 @@ function DoctorDashboard() {
           </div>
         )
       }
+      </>}
+
+      {activeTab === "consultation" && <>
+        <p className="subtitle" style={{ marginBottom: 16 }}>In-patient consultation requests matching your specialty — minimum 3 sessions per booking.</p>
+        {consultLoading ? <p style={{ color: "#888" }}>Loading consultations...</p> :
+          consultations.length === 0 ? <p style={{ color: "#888" }}>No consultation requests for your specialty at the moment.</p> : (
+          <div className="duties-grid">
+            {consultations.map((duty) => (
+              <div key={duty.id} className="duty-card" style={{ borderLeft: "4px solid #1565c0" }}>
+                <div style={{ display: "inline-block", background: "#e3f2fd", color: "#1565c0", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  In-Patient Consultation
+                </div>
+                <div className="duty-header">
+                  <h3>📍 {duty.hospitals?.area || "Bangalore"}</h3>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="pay" style={{ fontSize: 15 }}>Rs.{(duty.gross_pay || (duty.pay * 3)).toLocaleString()}</div>
+                    <div style={{ fontSize: 11, color: "#888" }}>Rs.{(duty.pay || 0).toLocaleString()} × 3 sessions</div>
+                  </div>
+                </div>
+                <div className="duty-details">
+                  <p>📅 First consult: {formatDate(duty.date)}</p>
+                  <p>🕐 Preferred slot: {getSlotLabel(duty.start_time)}</p>
+                  <p>🎓 {duty.qualification}</p>
+                  <p style={{ fontSize: 12, color: "#1565c0", marginTop: 6 }}>3 sessions: Initial · Review · Discharge</p>
+                  {duty.notes && <p>📝 {duty.notes}</p>}
+                  <p style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>Hospital name shared after confirmation</p>
+                </div>
+                <button className="book-btn" onClick={() => bookConsultation(duty)} disabled={bookingConsult === duty.id || !!myLockedDuty}>
+                  {bookingConsult === duty.id ? "Accepting..." : myLockedDuty ? "Duty Pending" : "Accept Consultation"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </>}
     </div>
   );
 }
