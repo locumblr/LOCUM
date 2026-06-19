@@ -90,6 +90,13 @@ function Login() {
         if (nurse.status === "frozen") { await supabase.auth.signOut(); setError("Your account has been suspended."); setLoading(false); return; }
         if (nurse.status === "rejected") { await supabase.auth.signOut(); setError("Your application was rejected."); setLoading(false); return; }
         navigate("/nurse/dashboard");
+      } else if (role === "technician") {
+        const { data: tech } = await supabase.from("technicians").select("status").eq("id", data.user.id).single();
+        if (!tech) { await supabase.auth.signOut(); setError("Technician account not found."); setLoading(false); return; }
+        if (tech.status === "pending") { await supabase.auth.signOut(); setError("Your application is under review."); setLoading(false); return; }
+        if (tech.status === "frozen") { await supabase.auth.signOut(); setError("Your account has been suspended."); setLoading(false); return; }
+        if (tech.status === "rejected") { await supabase.auth.signOut(); setError("Your application was rejected."); setLoading(false); return; }
+        navigate("/technician/dashboard");
       } else if (role === "hospital") {
         const { data: hospital } = await supabase.from("hospitals").select("status").eq("id", data.user.id).single();
         if (hospital?.status === "pending") { await supabase.auth.signOut(); setError("Your account is still under review."); setLoading(false); return; }

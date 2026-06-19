@@ -135,6 +135,11 @@ const fieldStyle = {
   width: "100%",
 };
 
+const TECH_CATEGORIES = [
+  "Blood Bank", "OT/C-arm", "MRI", "Radiology",
+  "Dialysis", "Anaesthesia Tech", "Lab Tech",
+];
+
 const CONSULTATION_SPECIALTIES = [
   "Rheumatology", "Haematology", "Medical Oncology", "Surgical Oncology",
   "Nephrology", "Gastroenterology", "Hepatology", "Endocrinology",
@@ -215,6 +220,10 @@ function HospitalDashboard() {
   const [showConsultForm, setShowConsultForm] = useState(false);
   const [consultForm, setConsultForm] = useState(emptyConsultForm);
   const [submittingConsult, setSubmittingConsult] = useState(false);
+  const [showTechForm, setShowTechForm] = useState(false);
+  const [techForm, setTechForm] = useState(emptyForm);
+  const [submittingTech, setSubmittingTech] = useState(false);
+  const [selectedTechCategory, setSelectedTechCategory] = useState("");
 
   useEffect(() => { fetchHospitalData(); }, []);
 
@@ -388,6 +397,46 @@ function HospitalDashboard() {
     setSubmittingConsult(false);
   };
 
+  const handleTech = (e) => setTechForm({ ...techForm, [e.target.name]: e.target.value });
+
+  const submitTech = async () => {
+    if (!selectedTechCategory) { alert("Please select a technician category."); return; }
+    if (!techForm.date || !techForm.start_time || !techForm.end_time || !techForm.pay) { alert("Please fill in all required fields."); return; }
+    setSubmittingTech(true);
+    const grossPay = parseFloat(techForm.pay);
+    const platformFee = Math.round(grossPay * 0.2);
+    const { error } = await supabase.from("locum_duties").insert({
+      hospital_id: hospitalId,
+      duty_type: "technician",
+      qualification: selectedTechCategory,
+      qualifications: [selectedTechCategory],
+      date: techForm.date,
+      start_time: techForm.start_time,
+      end_time: techForm.end_time,
+      pay: grossPay, gross_pay: grossPay, platform_fee: platformFee,
+      notes: techForm.notes,
+      booked: false, completed: false, booking_status: "open", payment_status: "unpaid",
+    });
+    if (error) {
+      alert("Error posting duty: " + error.message);
+    } else {
+      await supabase.functions.invoke("send-push", {
+        body: {
+          qualification: selectedTechCategory,
+          title: "New Technician Duty Available!",
+          body: `${selectedTechCategory} duty on ${formatDate(techForm.date)}. Rs.${grossPay.toLocaleString()}`,
+          url: "/technician/dashboard",
+        },
+      });
+      alert("Technician duty posted!");
+      setTechForm(emptyForm);
+      setSelectedTechCategory("");
+      setShowTechForm(false);
+      fetchDuties(hospitalId);
+    }
+    setSubmittingTech(false);
+  };
+
   const cancelLockedDuty = async (duty) => {
     const confirmed = window.confirm("Cancel this duty? The doctor/nurse will be notified and freed to take other duties.");
     if (!confirmed) return;
@@ -495,17 +544,21 @@ function HospitalDashboard() {
 
       {/* Post Buttons */}
       <div style={{ display: "flex", gap: 12, marginBottom: 32, flexDirection: "column" }}>
-        <button onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); setForm(emptyForm); setShowConsultForm(false); }}
+        <button onClick={() => { setShowForm(showForm === "doctor" ? null : "doctor"); setForm(emptyForm); setShowConsultForm(false); setShowTechForm(false); }}
           style={{ padding: "16px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
           {showForm === "doctor" ? "Cancel" : "+ Post Doctor Locum"}
         </button>
-        <button onClick={() => { setShowForm(showForm === "nurse" ? null : "nurse"); setForm(emptyForm); setShowConsultForm(false); }}
+        <button onClick={() => { setShowForm(showForm === "nurse" ? null : "nurse"); setForm(emptyForm); setShowConsultForm(false); setShowTechForm(false); }}
           style={{ padding: "16px 20px", background: "#6a0dad", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
           {showForm === "nurse" ? "Cancel" : "+ Post Nurse Locum"}
         </button>
-        <button onClick={() => { setShowConsultForm(!showConsultForm); setShowForm(null); setConsultForm(emptyConsultForm); }}
+        <button onClick={() => { setShowConsultForm(!showConsultForm); setShowForm(null); setShowTechForm(false); setConsultForm(emptyConsultForm); }}
           style={{ padding: "16px 20px", background: "#1565c0", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
           {showConsultForm ? "Cancel" : "+ Post Specialist Consultation"}
+        </button>
+        <button onClick={() => { setShowTechForm(!showTechForm); setShowForm(null); setShowConsultForm(false); setTechForm(emptyForm); setSelectedTechCategory(""); }}
+          style={{ padding: "16px 20px", background: "#00695c", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}>
+          {showTechForm ? "Cancel" : "+ Post Technician Locum"}
         </button>
       </div>
 
@@ -569,6 +622,70 @@ function HospitalDashboard() {
           <button type="button" onClick={submitConsult} disabled={submittingConsult}
             style={{ width: "100%", padding: 14, background: submittingConsult ? "#aaa" : "#1565c0", color: "white", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: submittingConsult ? "not-allowed" : "pointer", marginTop: 8 }}>
             {submittingConsult ? "Posting..." : "Post Consultation Request"}
+          </button>
+        </div>
+      )}
+
+      {/* Technician Form */}
+      {showTechForm && (
+        <div style={{ background: "white", borderRadius: 16, padding: "20px 16px", marginBottom: 32, boxShadow: "0 2px 16px rgba(0,0,0,0.08)", width: "100%", boxSizing: "border-box" }}>
+          <h2 style={{ color: "#00695c", marginBottom: 8, fontSize: 20 }}>Post a Technician Locum Duty</h2>
+          <div style={{ background: "#e0f2f1", border: "1px solid #00695c", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#004d40" }}>
+            ℹ️ Duty goes live immediately. When a technician accepts, you'll be notified to pay the platform fee (20% of duty pay) within 4 hours.
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Category</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {TECH_CATEGORIES.map(cat => (
+                <button key={cat} type="button" onClick={() => setSelectedTechCategory(cat)}
+                  style={{ padding: "9px 16px", borderRadius: 20, border: `2px solid ${selectedTechCategory === cat ? "#00695c" : "#ddd"}`,
+                    background: selectedTechCategory === cat ? "#00695c" : "white", color: selectedTechCategory === cat ? "white" : "#333",
+                    fontWeight: selectedTechCategory === cat ? 700 : 400, cursor: "pointer", fontSize: 14 }}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Date</label>
+            <input name="date" type="date" required onChange={handleTech} value={techForm.date} style={inputStyle} />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Start Time</label>
+            <input name="start_time" type="time" required onChange={handleTech} value={techForm.start_time} style={inputStyle} />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>End Time</label>
+            <input name="end_time" type="time" required onChange={handleTech} value={techForm.end_time} style={inputStyle} />
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Pay to Technician (Rs.)</label>
+            <input name="pay" type="number" placeholder="e.g. 3000" required onChange={handleTech} value={techForm.pay} style={inputStyle} />
+            {techForm.pay && parseFloat(techForm.pay) > 0 && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ background: "#e8f5e9", color: "#2e7d32", padding: "10px 14px", borderRadius: 8, fontSize: 13, display: "flex", justifyContent: "space-between" }}>
+                  <span>🔬 Technician receives</span>
+                  <span>Rs.{parseFloat(techForm.pay).toLocaleString()}</span>
+                </div>
+                <div style={{ background: "#e0f2f1", color: "#00695c", padding: "10px 14px", borderRadius: 8, fontSize: 13, display: "flex", justifyContent: "space-between" }}>
+                  <span>🏢 Platform fee (20%, incl. GST)</span>
+                  <span>Rs.{Math.round(parseFloat(techForm.pay) * 0.2).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Additional Notes (optional)</label>
+            <textarea name="notes" placeholder="Any special requirements..." onChange={handleTech} value={techForm.notes} rows={3} style={inputStyle} />
+          </div>
+
+          <button type="button" onClick={submitTech} disabled={submittingTech}
+            style={{ width: "100%", padding: 14, background: submittingTech ? "#aaa" : "#00695c", color: "white", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: submittingTech ? "not-allowed" : "pointer", marginTop: 8 }}>
+            {submittingTech ? "Posting..." : "Post Technician Duty"}
           </button>
         </div>
       )}

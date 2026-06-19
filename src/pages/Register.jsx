@@ -119,16 +119,18 @@ function Register() {
     <div className="register-container">
       <img src={logo} alt="LOCUM" className="register-logo" />
       <h1>Create Account</h1>
-      <p>Register as a Doctor, Nurse or Hospital</p>
+      <p>Register as a Doctor, Nurse, Technician or Hospital</p>
       {!role && (
         <div className="role-select">
           <button onClick={() => setRole("doctor")}>I am a Doctor</button>
           <button onClick={() => setRole("nurse")}>I am a Nurse</button>
+          <button onClick={() => setRole("technician")}>I am a Technician</button>
           <button onClick={() => setRole("hospital")}>I am a Hospital</button>
         </div>
       )}
       {role === "doctor" && <DoctorForm navigate={navigate} />}
       {role === "nurse" && <NurseForm navigate={navigate} />}
+      {role === "technician" && <TechnicianForm navigate={navigate} />}
       {role === "hospital" && <HospitalForm navigate={navigate} />}
       {role && <p className="back-link" onClick={() => setRole(null)}>← Go back</p>}
       <p className="switch-link">
@@ -328,6 +330,102 @@ function NurseForm({ navigate }) {
       </div>
       <label className="file-label">
         Upload Primary Certificate / Proof of Qualification
+        <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
+      </label>
+      {certificate && <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {certificate.name}</p>}
+      <input name="password" type="password" placeholder="Create Password" required onChange={handle} />
+      <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handle} />
+      <TermsBox agreed={agreed} setAgreed={setAgreed} />
+      <button type="submit" disabled={loading || !agreed}>{loading ? "Submitting..." : "Submit Application"}</button>
+    </form>
+  );
+}
+
+const technicianCategories = [
+  "Blood Bank", "OT/C-arm", "MRI", "Radiology",
+  "Dialysis", "Anaesthesia Tech", "Lab Tech",
+];
+
+function TechnicianForm({ navigate }) {
+  const [form, setForm] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    qualification: "", experience: "",
+    registrationNumber: "",
+    password: "", confirmPassword: "",
+  });
+  const [certificate, setCertificate] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [agreed, setAgreed] = useState(false);
+
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!agreed) { setError("You must agree to the Terms of Service and Privacy Policy to continue."); return; }
+    if (form.password !== form.confirmPassword) { setError("Passwords do not match!"); return; }
+    if (!certificate) { setError("Please upload your certificate."); return; }
+    setLoading(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email, password: form.password, options: { data: { role: "technician" } },
+      });
+      if (authError) throw authError;
+      const fileExt = certificate.name.split(".").pop();
+      const fileName = `technicians/${authData.user.id}/certificate.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(fileName, certificate);
+      if (uploadError) throw uploadError;
+      const { error: dbError } = await supabase.from("technicians").insert({
+        id: authData.user.id, first_name: form.firstName, last_name: form.lastName,
+        email: form.email, phone: form.phone, qualification: form.qualification,
+        experience: parseInt(form.experience) || 0,
+        registration_number: form.registrationNumber,
+        document_url: fileName, status: "pending",
+      });
+      if (dbError) throw dbError;
+      await sendEmail({
+        to: form.email, subject: "Application Received – LOCUM",
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
+          <h1 style="color:#1e3a5f;">LOCUM</h1>
+          <h2>Hi ${form.firstName} ${form.lastName},</h2>
+          <p>Thank you for registering on <strong>LOCUM</strong> as a <strong>${form.qualification} Technician</strong>.</p>
+          <p>Your application is <strong>pending verification</strong> by our team. This usually takes up to <strong>24 hours</strong>.</p>
+          <p>You will receive another email once your account is approved and active.</p>
+          <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
+        </div>`,
+      });
+      await supabase.auth.signOut();
+      alert("Application submitted! Our team will verify your registration and notify you once approved.");
+      navigate("/login");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="register-form">
+      <h2>Technician Registration</h2>
+      <div style={{ background: "#e3f2fd", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#1565c0", lineHeight: 1.6 }}>
+        ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
+      </div>
+      {error && <p className="error-msg">{error}</p>}
+      <div className="form-row">
+        <input name="firstName" placeholder="First Name" required onChange={handle} />
+        <input name="lastName" placeholder="Last Name" required onChange={handle} />
+      </div>
+      <input name="email" type="email" placeholder="Email Address" required onChange={handle} />
+      <input name="phone" type="tel" placeholder="Phone Number" required onChange={handle} />
+      <select name="qualification" required onChange={handle} defaultValue="">
+        <option value="" disabled>Select Your Specialty</option>
+        {technicianCategories.map((q) => <option key={q} value={q}>{q}</option>)}
+      </select>
+      <input name="experience" placeholder="Years of Experience" type="number" min="0" required onChange={handle} />
+      <input name="registrationNumber" placeholder="Diploma / Registration Number (if applicable)" onChange={handle} />
+      <label className="file-label">
+        Upload Certificate / Proof of Qualification
         <input type="file" accept=".pdf,.jpg,.png" onChange={(e) => setCertificate(e.target.files[0])} required />
       </label>
       {certificate && <p style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✅ {certificate.name}</p>}

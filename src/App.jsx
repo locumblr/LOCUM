@@ -18,6 +18,8 @@ import Support from "./pages/Support";
 import Help from "./pages/Help";
 import NurseDashboard from "./pages/NurseDashboard";
 import NurseLocums from "./pages/NurseLocums";
+import TechnicianDashboard from "./pages/TechnicianDashboard";
+import TechnicianLocums from "./pages/TechnicianLocums";
 import Landing from "./pages/Landing";
 import DepartmentLogin from "./pages/DepartmentLogin";
 import DepartmentDashboard from "./pages/DepartmentDashboard";
@@ -47,6 +49,9 @@ function App() {
         <Route path="/nurse/dashboard" element={<NurseDashboard />} />
         <Route path="/nurse/locums" element={<NurseLocums />} />
         <Route path="/nurse/profile" element={<Profile />} />
+        <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
+        <Route path="/technician/locums" element={<TechnicianLocums />} />
+        <Route path="/technician/profile" element={<Profile />} />
         <Route path="/help" element={<Help />} />
         <Route path="/department/login" element={<DepartmentLogin />} />
         <Route path="/department/dashboard" element={<DepartmentDashboard />} />

@@ -38,6 +38,7 @@ function AdminPanel() {
   const [doctors, setDoctors] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [nurses, setNurses] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [billing, setBilling] = useState([]);
@@ -62,9 +63,11 @@ function AdminPanel() {
     const { data: doc } = await supabase.from("doctors").select("*").order("created_at", { ascending: false });
     const { data: hosp } = await supabase.from("hospitals").select("*").order("created_at", { ascending: false });
     const { data: nur } = await supabase.from("nurses").select("*").order("created_at", { ascending: false });
+    const { data: tech } = await supabase.from("technicians").select("*").order("created_at", { ascending: false });
     setDoctors(doc || []);
     setHospitals(hosp || []);
     setNurses(nur || []);
+    setTechnicians(tech || []);
     setLoading(false);
   };
 
@@ -427,13 +430,16 @@ function AdminPanel() {
     const { error } = await supabase.from(table).update({ status }).eq("id", id);
     if (error) { alert("Error: " + error.message); return; }
 
-    // Approval emails for doctors and nurses
-    if ((table === "doctors" || table === "nurses") && status === "active") {
+    // Approval emails for doctors, nurses, and technicians
+    if ((table === "doctors" || table === "nurses" || table === "technicians") && status === "active") {
       const professional = table === "doctors"
         ? doctors.find(d => d.id === id)
-        : nurses.find(n => n.id === id);
+        : table === "nurses"
+        ? nurses.find(n => n.id === id)
+        : technicians.find(t => t.id === id);
       if (professional?.email) {
         const isDoctor = table === "doctors";
+        const roleLabel = isDoctor ? "doctor" : table === "nurses" ? "nurse" : "technician";
         await sendEmail({
           to: professional.email,
           subject: "Your LOCUM Account Has Been Approved!",
@@ -442,7 +448,7 @@ function AdminPanel() {
               <h1 style="color: #1e3a5f;">LOCUM</h1>
               <h2 style="color: #27ae60;">🎉 Account Approved!</h2>
               <p>Congratulations, ${isDoctor ? "Dr. " : ""}${professional.first_name} ${professional.last_name}!</p>
-              <p>Your ${isDoctor ? "doctor" : "nurse"} account has been <strong>verified and approved</strong>. You can now log in and start booking locum duties.</p>
+              <p>Your ${roleLabel} account has been <strong>verified and approved</strong>. You can now log in and start booking locum duties.</p>
               <a href="https://bookmylocum.com/login" style="display: inline-block; padding: 14px 28px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px;">Login Now</a>
               <p style="margin-top: 24px; color: #888; font-size: 13px;">If you have any questions, contact us at <a href="mailto:locum.blr@gmail.com">locum.blr@gmail.com</a></p>
               <p style="color: #888; font-size: 13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
@@ -499,7 +505,7 @@ function AdminPanel() {
     if (table === "hospitals") {
       await supabase.from("locum_duties").delete().eq("hospital_id", id).eq("completed", false);
     }
-    if (table === "doctors" || table === "nurses") {
+    if (table === "doctors" || table === "nurses" || table === "technicians") {
       await supabase.from("locum_duties").update({ booked: false, booked_by: null, booking_status: "open" }).eq("booked_by", id).eq("completed", false);
     }
     const { error } = await supabase.from(table).delete().eq("id", id);
@@ -524,6 +530,7 @@ function AdminPanel() {
 
   const flaggedDoctors = doctors.filter(d => d.flagged);
   const flaggedNurses = nurses.filter(n => n.flagged);
+  const flaggedTechnicians = technicians.filter(t => t.flagged);
   const pendingHospitals = hospitals.filter(h => h.status === "pending");
   const unpaidInvoices = invoices.filter(i => i.status !== "paid");
   const overdueInvoices = unpaidInvoices.filter(i => new Date(i.due_date) < new Date());
@@ -543,8 +550,9 @@ function AdminPanel() {
 
       <div className="stats-row">
         <div className="stat-card"><h3>{doctors.filter(d => d.status === "active").length}</h3><p>Active Doctors</p></div>
-        <div className="stat-card orange"><h3>{doctors.filter(d => d.status === "pending").length + nurses.filter(n => n.status === "pending").length}</h3><p>Pending Approvals</p></div>
+        <div className="stat-card orange"><h3>{doctors.filter(d => d.status === "pending").length + nurses.filter(n => n.status === "pending").length + technicians.filter(t => t.status === "pending").length}</h3><p>Pending Approvals</p></div>
         <div className="stat-card" style={{ borderTop: "3px solid #6a0dad" }}><h3 style={{ color: "#6a0dad" }}>{nurses.filter(n => n.status === "active").length}</h3><p>Active Nurses</p></div>
+        <div className="stat-card" style={{ borderTop: "3px solid #1565c0" }}><h3 style={{ color: "#1565c0" }}>{technicians.filter(t => t.status === "active").length}</h3><p>Active Technicians</p></div>
         <div className="stat-card green"><h3>{hospitals.filter(h => h.status === "active").length}</h3><p>Active Hospitals</p></div>
         <div className="stat-card orange"><h3>{pendingHospitals.length}</h3><p>Pending Hospitals</p></div>
         <div className="stat-card red"><h3>{overdueInvoices.length}</h3><p>Overdue Invoices</p></div>
@@ -553,6 +561,9 @@ function AdminPanel() {
       <div className="tabs">
         <button className={activeTab === "doctors" ? "active" : ""} onClick={() => setActiveTab("doctors")}>Doctors</button>
         <button className={activeTab === "nurses" ? "active" : ""} onClick={() => setActiveTab("nurses")}>Nurses</button>
+        <button className={activeTab === "technicians" ? "active" : ""} onClick={() => setActiveTab("technicians")}>
+          Technicians {technicians.filter(t => t.status === "pending").length > 0 && <span className="badge" style={{ background: "#1565c0" }}>{technicians.filter(t => t.status === "pending").length}</span>}
+        </button>
         <button className={activeTab === "hospitals" ? "active" : ""} onClick={() => setActiveTab("hospitals")}>
           Hospitals {pendingHospitals.length > 0 && <span className="badge">{pendingHospitals.length}</span>}
         </button>
@@ -626,6 +637,38 @@ function AdminPanel() {
                       {nur.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("nurses", nur.id, "frozen")}>Freeze</button>}
                       {nur.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("nurses", nur.id, "active")}>Unfreeze</button>}
                       <button className="delete-btn" onClick={() => deleteAccount("nurses", nur.id)}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === "technicians" && (
+            <table className="admin-table">
+              <thead>
+                <tr><th>Name</th><th>Email</th><th>Phone</th><th>Specialty</th><th>Experience</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                {technicians.length === 0 ? (
+                  <tr><td colSpan="7" className="empty">No technicians registered yet</td></tr>
+                ) : technicians.map(tech => (
+                  <tr key={tech.id}>
+                    <td>{tech.first_name} {tech.last_name} {tech.flagged && <span style={{ color: "#e74c3c", fontSize: 11 }}>⚑ Flagged</span>}</td>
+                    <td>{tech.email}</td>
+                    <td>{tech.phone}</td>
+                    <td>{tech.qualification}</td>
+                    <td>{tech.experience} yrs</td>
+                    <td><span className={`status-pill ${tech.status}`}>{tech.status}</span></td>
+                    <td>
+                      <button className="view-btn" onClick={() => setSelected({ ...tech, type: "technician" })}>View</button>
+                      {tech.status === "pending" && <>
+                        <button className="approve-btn" onClick={() => updateStatus("technicians", tech.id, "active")}>Approve</button>
+                        <button className="reject-btn" onClick={() => updateStatus("technicians", tech.id, "rejected")}>Reject</button>
+                      </>}
+                      {tech.status === "active" && <button className="freeze-btn" onClick={() => updateStatus("technicians", tech.id, "frozen")}>Freeze</button>}
+                      {tech.status === "frozen" && <button className="unfreeze-btn" onClick={() => updateStatus("technicians", tech.id, "active")}>Unfreeze</button>}
+                      <button className="delete-btn" onClick={() => deleteAccount("technicians", tech.id)}>Delete</button>
                     </td>
                   </tr>
                 ))}
