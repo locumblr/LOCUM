@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&display=swap');
+
 * { box-sizing: border-box; }
 
 .landing {
@@ -25,7 +27,7 @@
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 28px;
 }
 
 .nav-links a {
@@ -109,98 +111,99 @@
   color: white;
 }
 
+/* ── Hero ── */
 .hero {
-  padding: 100px 60px;
-  max-width: 1200px;
+  background: #1e3a5f;
+  padding: 80px 60px 100px;
+  text-align: center;
+}
+
+.hero-content {
+  max-width: 700px;
   margin: 0 auto;
 }
 
-.hero-content { max-width: 640px; margin: 0 auto; text-align: center; }
-
-.hero-badge {
-  display: inline-block;
-  background: #e8f5e9;
-  color: #2e7d32;
-  padding: 6px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 24px;
+.hero-logo {
+  width: 180px;
+  margin-bottom: 32px;
+  filter: brightness(0) invert(1);
 }
 
 .hero h1 {
-  font-size: 64px;
-  font-weight: 700;
-  line-height: 1.1;
-  color: #1e3a5f;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 60px;
+  font-weight: 900;
+  line-height: 1.05;
+  color: white;
   margin-bottom: 24px;
-  letter-spacing: -1px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
 }
 
 .hero p {
-  font-size: 18px;
-  color: #666;
-  line-height: 1.6;
+  font-size: 17px;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.7;
   margin-bottom: 40px;
 }
 
 .hero-buttons {
   display: flex;
   gap: 16px;
-  margin-bottom: 60px;
+  margin-bottom: 64px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .hero-cta {
   padding: 16px 32px;
-  background: #1e3a5f;
-  color: white;
+  background: white;
+  color: #1e3a5f;
   border: none;
   border-radius: 10px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: 0.2s;
 }
 
-.hero-cta:hover { background: #16304d; transform: translateY(-1px); }
+.hero-cta:hover { background: #e8f0f8; transform: translateY(-1px); }
 
 .hero-secondary {
   padding: 16px 32px;
   background: transparent;
-  color: #1e3a5f;
-  border: 1px solid #1e3a5f;
+  color: white;
+  border: 1px solid rgba(255,255,255,0.5);
   border-radius: 10px;
   font-size: 16px;
   cursor: pointer;
   transition: 0.2s;
 }
 
-.hero-secondary:hover { background: #f0f4f8; }
+.hero-secondary:hover { background: rgba(255,255,255,0.1); }
 
 .hero-stats {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
+  flex-direction: row;
+  justify-content: center;
+  gap: 48px;
   width: 100%;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  padding-top: 40px;
 }
 
-.hero-stat {
-  width: 100%;
-  text-align: center;
-}
+.hero-stat { text-align: center; }
 
 .hero-stat h3 {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
-  color: #1e3a5f;
+  color: white;
   margin-bottom: 4px;
 }
 
-.hero-stat p { font-size: 14px; color: #888; }
+.hero-stat p { font-size: 13px; color: rgba(255,255,255,0.6); }
 
+/* ── Sections ── */
 .section { padding: 80px 60px; }
 .section.alt { background: #f9fafb; }
 
@@ -234,12 +237,6 @@
   color: #666;
   line-height: 1.7;
   margin-bottom: 24px;
-}
-
-.section-sub {
-  font-size: 18px;
-  color: #666;
-  margin-bottom: 48px;
 }
 
 .steps-grid {
@@ -306,7 +303,10 @@
 .section-cta:hover { background: #16304d; }
 .purple-cta { background: #6a0dad; }
 .purple-cta:hover { background: #5a0b9d; }
+.teal-cta { background: #00695c; }
+.teal-cta:hover { background: #004d40; }
 
+/* ── CTA Banner ── */
 .cta-banner {
   background: #1e3a5f;
   padding: 80px 60px;
@@ -330,81 +330,86 @@
   color: #1e3a5f;
 }
 
-.cta-banner .hero-cta:hover { background: #f0f4f8; }
+.cta-banner .hero-cta:hover { background: #e8f0f8; }
 
+/* ── Footer ── */
 .landing-footer {
   background: #0f1f33;
-  padding: 60px;
+  padding: 60px 40px 40px;
+  text-align: center;
 }
 
-.footer-inner {
-  max-width: 1100px;
+.footer-centered {
+  max-width: 900px;
   margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  gap: 60px;
-  flex-wrap: wrap;
   padding-bottom: 40px;
   border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.footer-brand p {
-  color: #aaa;
-  font-size: 14px;
-  margin-top: 12px;
-  line-height: 1.6;
-}
-
-.footer-links {
-  display: flex;
-  gap: 60px;
-}
-
-.footer-col {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 20px;
 }
 
-.footer-col h4 {
-  color: white;
-  font-size: 14px;
-  font-weight: 700;
-  margin-bottom: 4px;
+.footer-logo { width: 90px; }
+
+.footer-tagline {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  margin: 0;
 }
 
-.footer-col a, .footer-col span {
-  color: #aaa;
+.footer-links-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 28px;
+}
+
+.footer-links-row a,
+.footer-links-row span {
+  color: #888;
   font-size: 14px;
   text-decoration: none;
   cursor: pointer;
   transition: color 0.2s;
 }
 
-.footer-col a:hover, .footer-col span:hover { color: white; }
+.footer-links-row a:hover,
+.footer-links-row span:hover { color: white; }
 
 .footer-bottom {
-  max-width: 1100px;
+  max-width: 900px;
   margin: 0 auto;
   padding-top: 24px;
   text-align: center;
 }
 
-.footer-bottom p { color: #666; font-size: 13px; }
+.footer-bottom p { color: #555; font-size: 13px; }
 
+/* ── Mobile ── */
 @media (max-width: 768px) {
   .landing-nav { padding: 16px 20px; }
   .nav-links { display: none; }
   .nav-hamburger { display: block; }
-  .hero { padding: 60px 20px; }
-  .hero h1 { font-size: 40px; }
-  .hero p { font-size: 16px; }
+
+  .hero { padding: 60px 24px 80px; }
+  .hero-logo { width: 130px; }
+  .hero h1 { font-size: 36px; letter-spacing: 2px; }
+  .hero p { font-size: 15px; }
+  .hero-stats { gap: 24px; }
+  .hero-stat h3 { font-size: 15px; }
+
   .section { padding: 60px 20px; }
   .section h2 { font-size: 32px; }
   .steps-grid { grid-template-columns: 1fr; }
+
   .cta-banner { padding: 60px 20px; }
   .cta-banner h2 { font-size: 28px; }
-  .landing-footer { padding: 40px 20px; }
-  .footer-inner { flex-direction: column; gap: 32px; }
-  .footer-links { flex-direction: column; gap: 32px; }
+
+  .landing-footer { padding: 40px 20px 32px; }
+  .footer-links-row { gap: 8px 20px; }
 }
