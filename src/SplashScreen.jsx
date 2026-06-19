@@ -6,8 +6,8 @@ export default function SplashScreen({ onDone }) {
 
   useEffect(() => {
     const showTimer = setTimeout(() => setPhase("visible"), 50);
-    const outTimer  = setTimeout(() => setPhase("out"), 5000);
-    const doneTimer = setTimeout(() => onDone(), 6000);
+    const outTimer  = setTimeout(() => setPhase("out"), 4000);
+    const doneTimer = setTimeout(() => onDone(), 5000);
     return () => { clearTimeout(showTimer); clearTimeout(outTimer); clearTimeout(doneTimer); };
   }, []);
 
@@ -23,7 +23,7 @@ export default function SplashScreen({ onDone }) {
         src={logo}
         alt="LOCUM"
         style={{
-          width: 140,
+          width: 220,
           transform: phase === "in" ? "scale(0.7)" : "scale(1)",
           opacity: phase === "in" ? 0 : phase === "visible" ? 1 : 1,
           transition: "transform 1s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.9s ease",
