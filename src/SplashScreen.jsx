@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import logo from "./assets/logo.png";
 
 export default function SplashScreen({ onDone }) {
-  const [phase, setPhase] = useState("in"); // "in" → "hold" → "out"
+  const [phase, setPhase] = useState("in"); // "in" → "visible" → "out"
 
   useEffect(() => {
-    const holdTimer = setTimeout(() => setPhase("out"), 5000);
+    const showTimer = setTimeout(() => setPhase("visible"), 50);
+    const outTimer  = setTimeout(() => setPhase("out"), 5000);
     const doneTimer = setTimeout(() => onDone(), 6000);
-    return () => { clearTimeout(holdTimer); clearTimeout(doneTimer); };
+    return () => { clearTimeout(showTimer); clearTimeout(outTimer); clearTimeout(doneTimer); };
   }, []);
 
   return (
@@ -24,7 +25,7 @@ export default function SplashScreen({ onDone }) {
         style={{
           width: 140,
           transform: phase === "in" ? "scale(0.7)" : "scale(1)",
-          opacity: phase === "in" ? 0 : 1,
+          opacity: phase === "in" ? 0 : phase === "visible" ? 1 : 1,
           transition: "transform 1s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.9s ease",
         }}
       />
