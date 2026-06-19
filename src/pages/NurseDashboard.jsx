@@ -25,6 +25,7 @@ function NurseDashboard() {
   const [searchDate, setSearchDate] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
   const [myLockedDuty, setMyLockedDuty] = useState(null);
+  const [activeTab, setActiveTab] = useState("All");
 
   useEffect(() => { fetchNurseData(); }, []);
 
@@ -40,8 +41,8 @@ function NurseDashboard() {
     if (!nurse || nurse.status !== "active") { navigate("/login"); return; }
     setNurseName(`${nurse.first_name} ${nurse.last_name}`);
     setNurseQualification(nurse.qualification);
-    fetchDuties(nurse.qualification, user.id);
-    fetchCoverRequests(nurse.qualification, user.id);
+    fetchDuties(user.id);
+    fetchCoverRequests(user.id);
     fetchMyLockedDuty(user.id);
   };
 
@@ -55,13 +56,12 @@ function NurseDashboard() {
     setMyLockedDuty(data || null);
   };
 
-  const fetchDuties = async (qualification, uid) => {
+  const fetchDuties = async (uid) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("locum_duties")
       .select("*, hospitals(hospital_name, area, address)")
       .eq("duty_type", "nurse")
-      .or(`qualification.eq.${qualification},qualifications.cs.{${qualification}}`)
       .eq("booked", false)
       .eq("completed", false)
       .eq("booking_status", "open")
@@ -71,16 +71,14 @@ function NurseDashboard() {
     setLoading(false);
   };
 
-  const fetchCoverRequests = async (qualification, userId) => {
+  const fetchCoverRequests = async (userId) => {
     const { data, error } = await supabase
       .from("cover_requests")
       .select("*, locum_duties(*, hospitals(hospital_name, area, address)), nurses(first_name, last_name)")
       .eq("status", "open")
       .neq("requesting_doctor_id", userId);
     if (!error) {
-      const filtered = (data || []).filter(cr =>
-        cr.locum_duties?.qualification === qualification && cr.locum_duties?.duty_type === "nurse"
-      );
+      const filtered = (data || []).filter(cr => cr.locum_duties?.duty_type === "nurse");
       setCoverRequests(filtered);
     }
   };
@@ -97,7 +95,7 @@ function NurseDashboard() {
     if (latest?.booked || latest?.booking_status !== "open") {
       alert("Sorry, this duty was just taken by someone else!");
       setBooking(null);
-      fetchDuties(nurseQualification, nurseId);
+      fetchDuties(nurseId);
       return;
     }
 
@@ -115,7 +113,7 @@ function NurseDashboard() {
     });
 
     alert("Duty accepted! Waiting for hospital to confirm payment. You'll be notified once confirmed.");
-    fetchDuties(nurseQualification, nurseId);
+    fetchDuties(nurseId);
     fetchMyLockedDuty(user.id);
     setBooking(null);
   };
@@ -137,8 +135,8 @@ function NurseDashboard() {
       message: `${coveringNurse?.first_name} ${coveringNurse?.last_name} has accepted cover for the ${coverRequest.locum_duties?.qualification} duty on ${coverRequest.locum_duties?.date}. Pay to confirm.`,
     });
     alert("Cover accepted! Waiting for hospital to confirm payment.");
-    fetchDuties(nurseQualification, nurseId);
-    fetchCoverRequests(nurseQualification, nurseId);
+    fetchDuties(nurseId);
+    fetchCoverRequests(nurseId);
     fetchMyLockedDuty(nurseId);
     setAccepting(null);
   };
@@ -155,12 +153,17 @@ function NurseDashboard() {
     return `${hours}h ${mins}m`;
   };
 
+  const TABS = ["All", "Ward", "OT", "ICU", "Dialysis", "ER"];
+
   const filteredDuties = duties.filter(duty => {
     const matchesDate = searchDate ? duty.date === searchDate : true;
     const matchesLocation = searchLocation
       ? duty.hospitals?.area?.toLowerCase().includes(searchLocation.toLowerCase())
       : true;
-    return matchesDate && matchesLocation;
+    const matchesTab = activeTab === "All" ? true
+      : activeTab === "OT" ? duty.qualification?.startsWith("OT")
+      : duty.qualification === activeTab;
+    return matchesDate && matchesLocation && matchesTab;
   });
 
   return (
@@ -219,7 +222,17 @@ function NurseDashboard() {
       )}
 
       <h2>Available Nurse Locum Duties</h2>
-      <p className="subtitle">{nurseQualification ? `Showing duties matching: ${nurseQualification}` : "Loading..."}</p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0 16px" }}>
+        {TABS.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{ padding: "8px 18px", borderRadius: 20, border: `2px solid ${activeTab === tab ? "#1e3a5f" : "#ddd"}`,
+              background: activeTab === tab ? "#1e3a5f" : "white", color: activeTab === tab ? "white" : "#555",
+              fontWeight: activeTab === tab ? 700 : 400, cursor: "pointer", fontSize: 14 }}>
+            {tab}
+          </button>
+        ))}
+      </div>
 
       <div className="search-bar">
         <input type="date" className="search-input" value={searchDate} onChange={(e) => setSearchDate(e.target.value)} />
@@ -230,7 +243,7 @@ function NurseDashboard() {
       </div>
 
       {loading ? <p style={{ color: "#888" }}>Loading duties...</p> :
-        duties.length === 0 ? <p style={{ color: "#888" }}>No available duties matching your qualification at the moment.</p> :
+        duties.length === 0 ? <p style={{ color: "#888" }}>No available nurse duties at the moment.</p> :
         filteredDuties.length === 0 ? (
           <p style={{ color: "#888" }}>No duties match your search. <span style={{ color: "#1e3a5f", cursor: "pointer" }} onClick={() => { setSearchDate(""); setSearchLocation(""); }}>Clear filters</span></p>
         ) : (

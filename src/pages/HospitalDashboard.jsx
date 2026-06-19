@@ -45,13 +45,61 @@ const allQualifications = [
   "PCPNDT Certified Sonologist", "Fellowship in Emergency Medicine (FCEM)", "Other",
 ];
 
-const nursingQualifications = [
-  "GNM (General Nursing & Midwifery)", "B.Sc Nursing", "Post Basic B.Sc Nursing",
-  "M.Sc Nursing", "Critical Care Nursing", "Operation Theatre Nursing",
-  "Emergency & Trauma Nursing", "Paediatric Nursing", "Oncology Nursing",
-  "Dialysis Nursing", "ICU Nursing", "NICU Nursing", "PICU Nursing",
-  "Midwifery", "Community Health Nursing", "Psychiatric Nursing", "Other",
-];
+const NURSING_AREAS = ["Ward", "OT", "ICU", "Dialysis", "ER"];
+const OT_SUBTYPES = ["General Surgery", "Orthopaedics", "Neurosurgery", "Obstetrics & Gynaecology"];
+
+function NursingAreaPicker({ selected, onSelect }) {
+  const isOT = selected.length > 0 && selected[0].startsWith("OT");
+  const showOTSubs = isOT || selected[0] === undefined && false;
+
+  const selectArea = (area) => {
+    if (area === "OT") {
+      onSelect(["OT"]);
+    } else {
+      onSelect([area]);
+    }
+  };
+
+  const selectOTSub = (sub) => {
+    onSelect([`OT - ${sub}`]);
+  };
+
+  const activeArea = selected[0]?.startsWith("OT") ? "OT" : selected[0];
+  const activeOTSub = selected[0]?.startsWith("OT - ") ? selected[0].replace("OT - ", "") : null;
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        {NURSING_AREAS.map(area => (
+          <button key={area} type="button" onClick={() => selectArea(area)}
+            style={{ padding: "9px 18px", borderRadius: 20, border: `2px solid ${activeArea === area ? "#1e3a5f" : "#ddd"}`,
+              background: activeArea === area ? "#1e3a5f" : "white", color: activeArea === area ? "white" : "#333",
+              fontWeight: activeArea === area ? 700 : 400, cursor: "pointer", fontSize: 14 }}>
+            {area}
+          </button>
+        ))}
+      </div>
+      {activeArea === "OT" && (
+        <div style={{ marginLeft: 8, paddingLeft: 16, borderLeft: "3px solid #1e3a5f", marginTop: 10 }}>
+          <p style={{ fontSize: 13, color: "#555", marginBottom: 8, fontWeight: 600 }}>Select OT specialty:</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {OT_SUBTYPES.map(sub => (
+              <button key={sub} type="button" onClick={() => selectOTSub(sub)}
+                style={{ padding: "7px 14px", borderRadius: 20, border: `2px solid ${activeOTSub === sub ? "#6a0dad" : "#ddd"}`,
+                  background: activeOTSub === sub ? "#6a0dad" : "white", color: activeOTSub === sub ? "white" : "#333",
+                  fontWeight: activeOTSub === sub ? 700 : 400, cursor: "pointer", fontSize: 13 }}>
+                {sub}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {selected.length > 0 && selected[0] !== "OT" && (
+        <p style={{ fontSize: 13, color: "#27ae60", marginTop: 10 }}>✓ {selected[0]}</p>
+      )}
+    </div>
+  );
+}
 
 const emptyForm = { date: "", start_time: "", end_time: "", qualifications: [], pay: "", notes: "" };
 
@@ -241,7 +289,8 @@ function HospitalDashboard() {
   const removeQual = (q) => setForm({ ...form, qualifications: form.qualifications.filter(x => x !== q) });
 
   const submit = async () => {
-    if (form.qualifications.length === 0) { alert("Please select at least one qualification."); return; }
+    if (form.qualifications.length === 0) { alert(showForm === "nurse" ? "Please select a duty area." : "Please select at least one qualification."); return; }
+    if (showForm === "nurse" && form.qualifications[0] === "OT") { alert("Please select an OT specialty (General Surgery, Orthopaedics, Neurosurgery, or OBG)."); return; }
     if (!form.date || !form.start_time || !form.end_time || !form.pay) { alert("Please fill in all required fields."); return; }
     setSubmitting(true);
     const grossPay = parseFloat(form.pay);
@@ -426,20 +475,29 @@ function HospitalDashboard() {
 
           <div style={fieldStyle}>
             <label style={labelStyle}>
-              Required Qualifications{" "}
-              {form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13, textTransform: "none" }}>({form.qualifications.length} selected)</span>}
+              {showForm === "nurse" ? "Duty Area" : "Required Qualifications"}{" "}
+              {showForm !== "nurse" && form.qualifications.length > 0 && <span style={{ color: "#27ae60", fontSize: 13, textTransform: "none" }}>({form.qualifications.length} selected)</span>}
             </label>
-            {isRadiology(form.qualifications) && (
-              <div style={{ background: "#fff8e1", border: "1px solid #ffcc02", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#795500", marginBottom: 8 }}>
-                ⚠️ <strong>PCPNDT Notice:</strong> Select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
-              </div>
+            {showForm === "nurse" ? (
+              <NursingAreaPicker
+                selected={form.qualifications}
+                onSelect={(areas) => setForm({ ...form, qualifications: areas })}
+              />
+            ) : (
+              <>
+                {isRadiology(form.qualifications) && (
+                  <div style={{ background: "#fff8e1", border: "1px solid #ffcc02", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#795500", marginBottom: 8 }}>
+                    ⚠️ <strong>PCPNDT Notice:</strong> Select <strong>"with PCPNDT Certification"</strong> if this duty involves ultrasound examinations.
+                  </div>
+                )}
+                <QualificationPicker
+                  qualifications={allQualifications}
+                  selected={form.qualifications}
+                  onAdd={addQual}
+                  onRemove={removeQual}
+                />
+              </>
             )}
-            <QualificationPicker
-              qualifications={showForm === "nurse" ? nursingQualifications : allQualifications}
-              selected={form.qualifications}
-              onAdd={addQual}
-              onRemove={removeQual}
-            />
           </div>
 
           <div style={fieldStyle}>
