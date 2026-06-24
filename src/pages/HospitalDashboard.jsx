@@ -507,8 +507,8 @@ function HospitalDashboard() {
           {hospitalName && <p style={{ color: "#888", fontSize: 14, margin: "4px 0 0" }}>{hospitalName}</p>}
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={() => navigate("/hospital/locums")} style={{ padding: "10px 20px", border: "none", borderRadius: 8, background: "#1e3a5f", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 500 }}>My Locums</button>
-          <button onClick={() => navigate("/hospital/profile")} style={{ padding: "10px 20px", border: "none", borderRadius: 8, background: "#1e3a5f", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 500 }}>Profile</button>
+          <button onClick={() => navigate("/hospital/locums")} style={{ padding: "10px 0", width: 110, border: "none", borderRadius: 8, background: "#1e3a5f", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 500, textAlign: "center" }}>My Locums</button>
+          <button onClick={() => navigate("/hospital/profile")} style={{ padding: "10px 0", width: 110, border: "none", borderRadius: 8, background: "#1e3a5f", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 500, textAlign: "center" }}>Profile</button>
           <div style={{ position: "relative" }}>
             <button onClick={() => setShowMenu(!showMenu)} style={{ position: "relative", padding: "10px 16px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>
               {unreadCount > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, background: "#e74c3c", borderRadius: "50%" }} />}
