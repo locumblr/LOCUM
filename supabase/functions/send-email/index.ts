@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const RESEND_API_KEY = "re_BbmkKJsS_Dqf5LxwtW7RCEYfNuWuuhfsG";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +13,13 @@ serve(async (req) => {
   }
 
   try {
+    if (!RESEND_API_KEY) {
+      return new Response(JSON.stringify({ error: "RESEND_API_KEY secret is not set" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+
     const body = await req.text();
     if (!body) {
       return new Response(JSON.stringify({ error: "Empty body" }), {
