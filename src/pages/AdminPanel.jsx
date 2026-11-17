@@ -1,36 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { sendEmail } from "../sendEmail";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import "./AdminPanel.css";
-
-const RESEND_API_KEY = "re_ioKynYaT_7PSAWgetJWydU68JNvkJG3NG";
-
-const sendEmail = async ({ to, subject, html }) => {
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: "noreply@bookmylocum.com",
-        reply_to: "locum.blr@gmail.com",
-        to: [to],
-        subject,
-        html,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      console.error("Resend error:", err);
-    }
-  } catch (err) {
-    console.error("Email send failed:", err);
-  }
-};
 
 function AdminPanel() {
   const navigate = useNavigate();

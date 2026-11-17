@@ -1,22 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { sendEmail } from "../sendEmail";
 import "./Register.css";
 import logo from "../assets/logo.png";
-
-const RESEND_API_KEY = "re_ioKynYaT_7PSAWgetJWydU68JNvkJG3NG";
-
-const sendEmail = async ({ to, subject, html }) => {
-  try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
-      body: JSON.stringify({ from: "noreply@bookmylocum.com", reply_to: "locum.blr@gmail.com", to: [to], subject, html }),
-    });
-  } catch (err) {
-    console.error("Email send failed:", err);
-  }
-};
 
 const BANGALORE_AREAS = [
   "Whitefield", "Koramangala", "HSR Layout", "Indiranagar", "Jayanagar",

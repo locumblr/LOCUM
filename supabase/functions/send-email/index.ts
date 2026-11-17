@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
@@ -20,6 +21,21 @@ serve(async (req) => {
       });
     }
 
+    // Only signed-in users may send. The anon key is public, so without this
+    // anyone could use this function to send email from bookmylocum.com.
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } }
+    );
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Not signed in" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
     const body = await req.text();
     if (!body) {
       return new Response(JSON.stringify({ error: "Empty body" }), {
@@ -37,8 +53,9 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "LOCUM <onboarding@resend.dev>",
-        to,
+        from: "noreply@bookmylocum.com",
+        reply_to: "locum.blr@gmail.com",
+        to: Array.isArray(to) ? to : [to],
         subject,
         html,
       }),
