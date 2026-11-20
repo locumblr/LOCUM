@@ -226,23 +226,13 @@ create trigger protect_columns before update on public.monthly_invoices
     'fine_amount', 'total_due', 'status', 'due_date', 'paid_at', 'admin_verified', 'weeks_overdue');
 
 -- ---------------------------------------------------------------------------
--- Cover requests: the people involved and admins
+-- Cover requests: the people involved and admins. Created and resolved only
+-- through the server actions in 20261120010000_cover_requests.sql.
 -- ---------------------------------------------------------------------------
 
 create policy "Involved professionals or admin" on public.cover_requests
   for select to authenticated
-  using (
-    public.is_admin()
-    or requesting_doctor_id = auth.uid()
-    or covering_doctor_id = auth.uid()
-    or (status = 'open' and public.my_provider_type() is not null)
-  );
-create policy "Request cover for your own duty" on public.cover_requests
-  for insert to authenticated
-  with check (
-    requesting_doctor_id = auth.uid()
-    and exists (select 1 from public.locum_duties d where d.id = duty_id and d.booked_by = auth.uid())
-  );
+  using (public.is_admin() or requesting_doctor_id = auth.uid() or covering_doctor_id = auth.uid());
 create policy "Admins manage cover requests" on public.cover_requests
   for update to authenticated using (public.is_admin()) with check (public.is_admin());
 
