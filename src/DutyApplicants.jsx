@@ -66,6 +66,9 @@ function DutyApplicants({ duty, overview, cover, payer, canPay = true, onChange 
   const [booked, setBooked] = useState(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  const [credit, setCredit] = useState(0);
+  const [claiming, setClaiming] = useState(false);
+  const [reasons, setReasons] = useState({});
 
   const count = overview?.applicants || 0;
   const paid = !!overview?.paid;
@@ -92,11 +95,45 @@ function DutyApplicants({ duty, overview, cover, payer, canPay = true, onChange 
     }
   }, [open, duty.id, paid, cover, overview]);
 
+  useEffect(() => {
+    if (canPay && isOpen && !paid && count > 0) {
+      supabase.rpc("get_credit_balance").then(({ data }) => setCredit(data || 0));
+    }
+  }, [canPay, isOpen, paid, count]);
+
+  const fee = Math.round((duty.platform_fee || 0) * 100);
+
   const pay = async () => {
     setBusy(true);
     const ok = await payPlatformFee(duty.id, payer);
     setBusy(false);
     if (ok) { setOpen(true); onChange(); }
+  };
+
+  const payWithCredit = async () => {
+    if (!window.confirm(`Use Rs.${(fee / 100).toLocaleString()} of your LOCUM credit to view these applicants?`)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("pay_with_credit", { p_duty_id: duty.id });
+    setBusy(false);
+    if (error) { alert(error.message); return; }
+    setOpen(true);
+    onChange();
+  };
+
+  const submitClaim = async () => {
+    const pending = (applicants || []).filter(a => a.status === "applied");
+    if (pending.some(a => (reasons[a.application_id] || "").trim().length < 10)) {
+      alert("Give a reason (at least 10 characters) for each applicant.");
+      return;
+    }
+    if (!window.confirm("Reject all applicants and ask LOCUM to review a refund?\n\nThe duty closes. Our team checks your reasons against each applicant's credentials; the fee is refunded only if we find a valid reason.")) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("submit_refund_claim", { p_duty_id: duty.id, p_reasons: reasons });
+    setBusy(false);
+    if (error) { alert(error.message); return; }
+    alert("Review requested. We'll notify you of the outcome.");
+    setClaiming(false);
+    onChange();
   };
 
   const select = async (a) => {
@@ -175,9 +212,16 @@ function DutyApplicants({ duty, overview, cover, payer, canPay = true, onChange 
           If none is suitable you can ask for a review; the fee is refunded only if our team finds a valid reason.
         </p>
         {canPay ? (
-          <button style={primaryBtn} disabled={busy} onClick={pay}>
-            {busy ? "Opening payment..." : `💳 Pay Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST) to view applicants`}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button style={primaryBtn} disabled={busy} onClick={pay}>
+              {busy ? "Opening payment..." : `💳 Pay Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST) to view applicants`}
+            </button>
+            {credit >= fee && fee > 0 && (
+              <button style={softBtn} disabled={busy} onClick={payWithCredit}>
+                Use credit (Rs.{(credit / 100).toLocaleString()} available)
+              </button>
+            )}
+          </div>
         ) : (
           <p style={{ color: "#795500", margin: 0, fontWeight: 600 }}>Your hospital's main account pays the platform fee to unlock these applicants. Once paid, you can review and select here.</p>
         )}
@@ -192,10 +236,36 @@ function DutyApplicants({ duty, overview, cover, payer, canPay = true, onChange 
         <p style={{ color: "#c62828", margin: "0 0 8px" }}>Select by {formatDeadline(overview.decision_deadline)}, or the duty closes and the fee is non-refundable.</p>
       )}
       {!open && <button style={primaryBtn} onClick={() => setOpen(true)}>Review {count} {count === 1 ? "applicant" : "applicants"}</button>}
-      {open && applicants && (
+      {open && applicants && !claiming && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {applicants.length === 0 && <p style={{ color: "#888", margin: 0 }}>All applicants have withdrawn. New applicants will appear here.</p>}
           {applicants.map(a => <ApplicantRow key={a.application_id} a={a} actionLabel="Select" onAction={select} busy={busy} />)}
+          {canPay && applicants.some(a => a.status === "applied") && (
+            <button style={{ ...btn, background: "#fce4ec", color: "#c62828", alignSelf: "flex-start" }} onClick={() => setClaiming(true)}>
+              None of these is suitable — request a refund review
+            </button>
+          )}
+        </div>
+      )}
+      {open && applicants && claiming && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p style={{ margin: 0, color: "#555", lineHeight: 1.5 }}>
+            Tell us why each applicant doesn't meet your requirements. Our team reviews these against their credentials.
+            If the reasons hold up, you choose a refund or credit; otherwise the fee is non-refundable.
+          </p>
+          {applicants.filter(a => a.status === "applied").map(a => (
+            <label key={a.application_id} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <strong>{a.provider_type === "doctor" ? "Dr. " : ""}{a.first_name} {a.last_name} — {a.qualification}</strong>
+              <textarea rows={2} value={reasons[a.application_id] || ""}
+                onChange={e => setReasons({ ...reasons, [a.application_id]: e.target.value })}
+                placeholder="e.g. No experience with paediatric cases, which this duty requires"
+                style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #ccd", fontFamily: "inherit", fontSize: 13 }} />
+            </label>
+          ))}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={{ ...btn, background: "#c62828", color: "white" }} disabled={busy} onClick={submitClaim}>{busy ? "…" : "Submit for review"}</button>
+            <button style={softBtn} onClick={() => setClaiming(false)}>Back</button>
+          </div>
         </div>
       )}
     </div>

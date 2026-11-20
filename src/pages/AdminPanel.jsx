@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import { sendEmail } from "../sendEmail";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import AdminRefundReviews from "./AdminRefundReviews";
 import "./AdminPanel.css";
 
 function AdminPanel() {
@@ -543,6 +544,7 @@ function AdminPanel() {
         <button className={activeTab === "flagged" ? "active" : ""} onClick={() => setActiveTab("flagged")}>
           Flagged {(flaggedDoctors.length + flaggedNurses.length) > 0 && <span className="badge" style={{ background: "#e74c3c" }}>{flaggedDoctors.length + flaggedNurses.length}</span>}
         </button>
+        <button className={activeTab === "refunds" ? "active" : ""} onClick={() => setActiveTab("refunds")}>Refund Reviews</button>
         <button className={activeTab === "billing" ? "active" : ""} onClick={() => { setActiveTab("billing"); fetchBilling(); }}>
           💰 Billing
           {paymentRequestedInvoices.length > 0 && <span className="badge" style={{ background: "#27ae60" }}>{paymentRequestedInvoices.length}</span>}
@@ -744,6 +746,8 @@ function AdminPanel() {
               )}
             </>
           )}
+
+          {activeTab === "refunds" && <AdminRefundReviews />}
 
           {activeTab === "billing" && (
             <div className="billing-section">
