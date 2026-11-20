@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
-import { sendEmail } from "../sendEmail";
+import DutyApplicants from "../DutyApplicants";
 import "./HospitalDashboard.css";
 
 const formatDate = (dateStr) => {
@@ -205,7 +205,8 @@ function HospitalDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
-  const [payingDutyId, setPayingDutyId] = useState(null);
+  const [overview, setOverview] = useState({});
+  const [coverByDuty, setCoverByDuty] = useState({});
   const [showConsultForm, setShowConsultForm] = useState(false);
   const [consultForm, setConsultForm] = useState(emptyConsultForm);
   const [submittingConsult, setSubmittingConsult] = useState(false);
@@ -215,13 +216,6 @@ function HospitalDashboard() {
   const [selectedTechCategory, setSelectedTechCategory] = useState("");
 
   useEffect(() => { fetchHospitalData(); }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (hospitalId) checkExpiredDuties(hospitalId);
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [hospitalId]);
 
   const fetchHospitalData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -235,59 +229,20 @@ function HospitalDashboard() {
     setHospitalEmail(data.email);
     fetchDuties(user.id);
     fetchNotifications(user.id);
-    checkExpiredDuties(user.id);
-  };
-
-  const checkExpiredDuties = async (uid) => {
-    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-    const { data: expiredDuties } = await supabase
-      .from("locum_duties")
-      .select("*, doctors(first_name, last_name, qualification, phone, email)")
-      .eq("hospital_id", uid)
-      .eq("booking_status", "locked")
-      .lt("locked_at", fourHoursAgo);
-    if (!expiredDuties || expiredDuties.length === 0) return;
-    for (const duty of expiredDuties) {
-      await supabase.from("locum_duties").update({
-        booking_status: "expired", booked: false, booked_by: null, locked_at: null,
-      }).eq("id", duty.id);
-      await supabase.from("notifications").insert({
-        user_id: uid,
-        title: "⏰ Duty Expired — Payment Not Received",
-        message: `The ${duty.qualification} duty on ${formatDate(duty.date)} was not confirmed within 4 hours and has expired.`,
-      });
-      const staff = duty.doctors || duty.nurses;
-      if (staff?.email) {
-        await sendEmail({
-          to: staff.email,
-          subject: "Duty Expired – LOCUM",
-          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
-            <h1 style="color:#1e3a5f;">LOCUM</h1>
-            <h2 style="color:#e74c3c;">⏰ Duty Expired</h2>
-            <p>Hi ${staff.first_name},</p>
-            <p>The hospital did not confirm your <strong>${duty.qualification}</strong> duty on <strong>${formatDate(duty.date)}</strong> within 4 hours. You are now free to book other duties.</p>
-            <a href="https://bookmylocum.com/login" style="display:inline-block;padding:14px 28px;background:#1e3a5f;color:white;text-decoration:none;border-radius:8px;margin-top:16px;">Find Other Duties</a>
-            <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
-          </div>`,
-        });
-      }
-    }
-    fetchDuties(uid);
-    fetchNotifications(uid);
   };
 
   const fetchDuties = async (uid) => {
     setLoading(true);
-    console.log("Fetching duties for uid:", uid);
-    const { data, error } = await supabase
-      .from("locum_duties")
-     .select("*, doctors(first_name, last_name, qualification, phone, email)")
-      .eq("hospital_id", uid)
-      .eq("completed", false)
-      .order("created_at", { ascending: false });
-    console.log("DATA:", JSON.stringify(data));
-    console.log("ERROR:", JSON.stringify(error));
+    const [{ data, error }, { data: ov }, { data: covers }] = await Promise.all([
+      supabase.from("locum_duties").select("*")
+        .eq("hospital_id", uid).eq("completed", false)
+        .order("created_at", { ascending: false }),
+      supabase.rpc("get_duty_overview"),
+      supabase.rpc("get_hospital_cover_requests"),
+    ]);
     if (!error) setDuties(data || []);
+    setOverview(Object.fromEntries((ov || []).map(o => [o.duty_id, o])));
+    setCoverByDuty(Object.fromEntries((covers || []).map(c => [c.duty_id, c])));
     setLoading(false);
   };
 
@@ -426,63 +381,12 @@ function HospitalDashboard() {
     setSubmittingTech(false);
   };
 
-  const cancelLockedDuty = async (duty) => {
-    const confirmed = window.confirm("Cancel this duty? The doctor/nurse will be notified and freed to take other duties.");
-    if (!confirmed) return;
-    await supabase.from("locum_duties").update({
-      booking_status: "expired", booked: false, booked_by: null, locked_at: null,
-    }).eq("id", duty.id);
-    const staff = duty.doctors || duty.nurses;
-    if (staff?.email) {
-      await sendEmail({
-        to: staff.email,
-        subject: "Duty Cancelled – LOCUM",
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
-          <h1 style="color:#1e3a5f;">LOCUM</h1>
-          <h2 style="color:#e74c3c;">Duty Cancelled</h2>
-          <p>Hi ${staff.first_name},</p>
-          <p>The hospital has cancelled the <strong>${duty.qualification}</strong> duty on <strong>${formatDate(duty.date)}</strong>. You are free to book other duties.</p>
-          <a href="https://bookmylocum.com/login" style="display:inline-block;padding:14px 28px;background:#1e3a5f;color:white;text-decoration:none;border-radius:8px;margin-top:16px;">Find Other Duties</a>
-          <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
-        </div>`,
-      });
-    }
-    await supabase.from("notifications").insert({
-      user_id: hospitalId,
-      title: "Duty Cancelled",
-      message: `The ${duty.qualification} duty on ${formatDate(duty.date)} has been cancelled.`,
-    });
-    fetchDuties(hospitalId);
-  };
-
-  const payPlatformFee = async (duty) => {
-    setPayingDutyId(duty.id);
-    const staff = duty.doctors || duty.nurses;
-    const staffType = duty.doctors ? "Doctor" : "Nurse";
-    const staffTitle = duty.doctors ? "Dr. " : "";
-    alert(
-      `Platform Fee Payment\n\nDuty: ${duty.qualification} on ${formatDate(duty.date)}\n${staffType}: ${staffTitle}${staff?.first_name} ${staff?.last_name}\n\nAmount: Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST)\n\nPayment gateway coming soon. Please contact locum.blr@gmail.com to complete payment and confirm this duty.`
-    );
-    setPayingDutyId(null);
-  };
-
   const logout = async () => { await supabase.auth.signOut(); navigate("/"); };
-
-  const getTimeRemaining = (lockedAt) => {
-    if (!lockedAt) return null;
-    const expiry = new Date(new Date(lockedAt).getTime() + 4 * 60 * 60 * 1000);
-    const diff = expiry - new Date();
-    if (diff <= 0) return "Expiring...";
-    const hours = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    return `${hours}h ${mins}m remaining`;
-  };
 
   const getStatusLabel = (duty) => {
     if (duty.booking_status === "confirmed") return <span className="status-badge status-confirmed">✅ Confirmed</span>;
-    if (duty.booking_status === "locked") return <span className="status-badge status-pending">🔒 Locked — Awaiting Payment</span>;
-    if (duty.booking_status === "expired") return <span className="status-badge" style={{ background: "#f5f5f5", color: "#999" }}>⏰ Expired</span>;
-    if (duty.booking_status === "reopened") return <span className="status-badge status-reopened">🔄 Re-opened</span>;
+    if (duty.booking_status === "expired") return <span className="status-badge" style={{ background: "#f5f5f5", color: "#999" }}>Closed</span>;
+    if (overview[duty.id]?.paid) return <span className="status-badge status-pending">Paid — select an applicant</span>;
     return <span className="status-badge status-open">Open</span>;
   };
 
@@ -771,13 +675,10 @@ function HospitalDashboard() {
         duties.length === 0 ? <p style={{ color: "#888", textAlign: "center", padding: "40px 20px" }}>No duties posted yet.</p> : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
           {duties.map((duty) => {
-            const staff = duty.doctors || duty.nurses;
-            const staffTitle = duty.doctors ? "Dr. " : "";
-            const isLocked = duty.booking_status === "locked";
             const isConfirmed = duty.booking_status === "confirmed";
             const isExpired = duty.booking_status === "expired";
             return (
-              <div key={duty.id} style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", opacity: isExpired ? 0.6 : 1, borderLeft: isConfirmed || isLocked ? "4px solid #f39c12" : "none" }}>
+              <div key={duty.id} style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", opacity: isExpired ? 0.6 : 1, borderLeft: isConfirmed ? "4px solid #27ae60" : overview[duty.id]?.applicants ? "4px solid #f39c12" : "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 10 }}>
                   <h3 style={{ color: "#1e3a5f", fontSize: 15, fontWeight: 600, flex: 1, lineHeight: 1.4, margin: 0 }}>
                     {duty.qualifications && duty.qualifications.length > 1 ? `${duty.qualifications.length} Qualifications` : duty.qualification}
@@ -801,33 +702,13 @@ function HospitalDashboard() {
                   )}
                   {duty.notes && <p style={{ color: "#555", fontSize: 14, marginBottom: 6 }}>📝 {duty.notes}</p>}
 
-                  {isConfirmed && staff && (
-                    <div style={{ marginTop: 10, background: "#e8f5e9", borderRadius: 8, padding: "10px 12px" }}>
-                      <p style={{ fontWeight: 700, color: "#2e7d32", marginBottom: 6, fontSize: 13 }}>✅ Confirmed Staff</p>
-                      <p style={{ fontSize: 13, margin: "2px 0" }}>👤 {staffTitle}{staff.first_name} {staff.last_name}</p>
-                      <p style={{ fontSize: 13, margin: "2px 0" }}>🎓 {staff.qualification}</p>
-                      <p style={{ fontSize: 13, margin: "2px 0" }}>📞 {staff.phone}</p>
-                    </div>
-                  )}
-
-                  {isLocked && (
-                    <div style={{ marginTop: 10, background: "#fff8e1", borderRadius: 8, padding: "10px 12px" }}>
-                      <p style={{ fontWeight: 700, color: "#795500", marginBottom: 6, fontSize: 13 }}>🔒 A {duty.duty_type === "nurse" ? "nurse" : "doctor"} has accepted</p>
-                      <p style={{ fontSize: 13, margin: "2px 0", color: "#888" }}>Pay platform fee to confirm and see full details</p>
-                      <p style={{ fontSize: 12, color: "#e74c3c", margin: "4px 0" }}>⏰ {getTimeRemaining(duty.locked_at)}</p>
-                      <p style={{ fontSize: 13, margin: "4px 0", fontWeight: 600, color: "#1e3a5f" }}>Platform fee: Rs.{(duty.platform_fee || 0).toLocaleString()} (incl. GST)</p>
-                      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                        <button onClick={() => payPlatformFee(duty)} disabled={payingDutyId === duty.id}
-                          style={{ padding: "10px 20px", background: "#1e3a5f", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                          {payingDutyId === duty.id ? "Processing..." : "💳 Pay & Confirm"}
-                        </button>
-                        <button onClick={() => cancelLockedDuty(duty)}
-                          style={{ padding: "10px 16px", background: "#fce4ec", color: "#c62828", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <DutyApplicants
+                    duty={duty}
+                    overview={overview[duty.id]}
+                    cover={coverByDuty[duty.id]}
+                    payer={{ name: hospitalName, email: hospitalEmail }}
+                    onChange={() => fetchDuties(hospitalId)}
+                  />
                 </div>
                 {getStatusLabel(duty)}
               </div>

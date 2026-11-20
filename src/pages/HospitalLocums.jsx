@@ -1,11 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import DutyApplicants from "../DutyApplicants";
 import "./HospitalLocums.css";
+
+const TYPE_TABS = [
+  { key: "doctor", label: "👨‍⚕️ Doctor Duties", matches: d => !d.duty_type || d.duty_type === "doctor" || d.duty_type === "consultation" },
+  { key: "nurse", label: "👩‍⚕️ Nurse Duties", matches: d => d.duty_type === "nurse" },
+  { key: "technician", label: "🔬 Technician Duties", matches: d => d.duty_type === "technician" },
+];
 
 function HospitalLocums() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
+  const [overview, setOverview] = useState({});
+  const [coverByDuty, setCoverByDuty] = useState({});
+  const [hospital, setHospital] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dutyTypeTab, setDutyTypeTab] = useState("doctor");
   const [statusTab, setStatusTab] = useState("open");
@@ -19,92 +29,31 @@ function HospitalLocums() {
   const fetchDuties = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-    const { data: hospital } = await supabase.from("hospitals").select("status").eq("id", user.id).single();
-    if (!hospital || hospital.status === "frozen") {
+    const { data: h } = await supabase.from("hospitals").select("status, hospital_name, email").eq("id", user.id).single();
+    if (!h || h.status === "frozen") {
       await supabase.auth.signOut();
       navigate("/login");
       return;
     }
-    const { data, error } = await supabase
-      .from("locum_duties")
-      .select("*, doctors(id, first_name, last_name, phone, email, qualification, experience, document_url), nurses(id, first_name, last_name, phone, email, qualification, experience, document_url)")
-      .eq("hospital_id", user.id)
-      .order("date", { ascending: false });
+    setHospital(h);
+    const [{ data, error }, { data: ov }, { data: covers }] = await Promise.all([
+      supabase.from("locum_duties").select("*").eq("hospital_id", user.id).order("date", { ascending: false }),
+      supabase.rpc("get_duty_overview"),
+      supabase.rpc("get_hospital_cover_requests"),
+    ]);
     if (!error) setDuties(data || []);
+    setOverview(Object.fromEntries((ov || []).map(o => [o.duty_id, o])));
+    setCoverByDuty(Object.fromEntries((covers || []).map(c => [c.duty_id, c])));
     setLoading(false);
-  };
-
-  const viewDocument = async (documentUrl) => {
-    if (!documentUrl) { alert("No document uploaded."); return; }
-    const { data, error } = await supabase.storage.from("documents").createSignedUrl(documentUrl, 60);
-    if (error) { alert("Error: " + error.message); return; }
-    window.open(data.signedUrl, "_blank");
-  };
-
-  const verifyBooking = async (dutyId) => {
-    const confirmed = window.confirm("Confirm credentials verified and approve for this duty?");
-    if (!confirmed) return;
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch("https://xdadenailnapeskzacyt.supabase.co/functions/v1/confirm-payment", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${session?.access_token}`,
-        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYWRlbmFpbG5hcGVza3phY3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzYyNDAsImV4cCI6MjA5MzU1MjI0MH0.RCYJXt6iyoRRRU_b7Ku_OeZIFtXLZGIKloVnSSvKddY",
-      },
-      body: JSON.stringify({ duty_id: dutyId, payment_ref: "MANUAL" }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert("Error confirming duty: " + (err.error || "Please try again."));
-      return;
-    }
-    alert("Professional confirmed! Invoice emailed to hospital.");
-    fetchDuties();
-  };
-
-  const rejectBooking = async (duty) => {
-    const reason = window.prompt("Reason for rejecting this professional:");
-    if (!reason) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: hospital } = await supabase.from("hospitals").select("hospital_name").eq("id", user.id).single();
-    const isNurse = duty.duty_type === "nurse";
-    const professional = isNurse ? duty.nurses : duty.doctors;
-    if (professional) {
-      await supabase.from(isNurse ? "nurses" : "doctors").update({
-        flagged: true, flag_reason: reason,
-        flagged_by: hospital?.hospital_name || "A hospital",
-      }).eq("id", professional.id);
-    }
-    await supabase.from("locum_duties").update({ booking_status: "open", booked: false, booked_by: null }).eq("id", duty.id);
-    alert("Professional rejected. Duty is now open again.");
-    fetchDuties();
   };
 
   const submitReview = async () => {
     if (!reviewStatus) { alert("Please select a review status."); return; }
     if (reviewStatus !== "satisfactory" && !reviewComment) { alert("Please provide a comment."); return; }
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: hospital } = await supabase.from("hospitals").select("hospital_name").eq("id", user.id).single();
-    await supabase.from("locum_duties").update({
-      review_status: reviewStatus,
-      review_comment: reviewComment,
-      reviewed_at: new Date().toISOString(),
-      completed: true,
-    }).eq("id", reviewingDuty.id);
-    if (reviewStatus !== "satisfactory") {
-      const isNurse = reviewingDuty.duty_type === "nurse";
-      const professional = isNurse ? reviewingDuty.nurses : reviewingDuty.doctors;
-      const flagReason = reviewStatus === "late" ? "Late to duty" :
-        reviewStatus === "absent" ? "Absent from duty" :
-        `Unsatisfactory: ${reviewComment}`;
-      if (professional) {
-        await supabase.from(isNurse ? "nurses" : "doctors").update({
-          flagged: true, flag_reason: flagReason,
-          flagged_by: hospital?.hospital_name || "A hospital",
-        }).eq("id", professional.id);
-      }
-    }
+    const { error } = await supabase.rpc("submit_duty_review", {
+      p_duty_id: reviewingDuty.id, p_status: reviewStatus, p_comment: reviewComment,
+    });
+    if (error) { alert(error.message); return; }
     alert("Review submitted!");
     setReviewingDuty(null);
     setReviewStatus("");
@@ -125,14 +74,13 @@ function HospitalLocums() {
       return <div className={`status-badge review-${duty.review_status}`}>{labels[duty.review_status] || "✅ Completed"}</div>;
     }
     if (duty.booking_status === "confirmed") return <div className="status-badge status-confirmed">✅ Confirmed</div>;
-    if (duty.booking_status === "reopened") return <div className="status-badge status-reopened">🔄 Re-opened</div>;
-    if (duty.booking_status === "pending_verification" || duty.booked) return <div className="status-badge status-pending">⏳ Pending Verification</div>;
+    if (duty.booking_status === "expired") return <div className="status-badge" style={{ background: "#f5f5f5", color: "#999" }}>Closed</div>;
+    if (overview[duty.id]?.paid) return <div className="status-badge status-pending">Paid — select an applicant</div>;
     return <div className="status-badge status-open">Open</div>;
   };
 
-  const doctorDuties = duties.filter(d => d.duty_type === "doctor" || !d.duty_type);
-  const nurseDuties = duties.filter(d => d.duty_type === "nurse");
-  const byType = dutyTypeTab === "doctor" ? doctorDuties : nurseDuties;
+  const tab = TYPE_TABS.find(t => t.key === dutyTypeTab);
+  const byType = duties.filter(tab.matches);
   const openDuties = byType.filter(d => !d.completed);
   const completedDuties = byType.filter(d => d.completed);
   const displayDuties = statusTab === "open" ? openDuties : completedDuties;
@@ -155,19 +103,18 @@ function HospitalLocums() {
         </div>
       </div>
 
-      {/* Doctor / Nurse tabs */}
       <div className="duty-type-tabs">
-        <button className={dutyTypeTab === "doctor" ? "active" : ""} onClick={() => setDutyTypeTab("doctor")}>
-          👨‍⚕️ Doctor Duties
-          {doctorDuties.length > 0 && <span className="tab-count">{doctorDuties.length}</span>}
-        </button>
-        <button className={`${dutyTypeTab === "nurse" ? "active" : ""} nurse-tab`} onClick={() => setDutyTypeTab("nurse")}>
-          👩‍⚕️ Nurse Duties
-          {nurseDuties.length > 0 && <span className="tab-count">{nurseDuties.length}</span>}
-        </button>
+        {TYPE_TABS.map(t => {
+          const n = duties.filter(t.matches).length;
+          return (
+            <button key={t.key} className={`${dutyTypeTab === t.key ? "active" : ""} ${t.key === "nurse" ? "nurse-tab" : ""}`} onClick={() => setDutyTypeTab(t.key)}>
+              {t.label}
+              {n > 0 && <span className="tab-count">{n}</span>}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Open / Completed sub-tabs */}
       <div className="status-tabs">
         <button className={statusTab === "open" ? "active" : ""} onClick={() => setStatusTab("open")}>
           📋 Open Duties
@@ -185,21 +132,18 @@ function HospitalLocums() {
         <div className="empty-state">
           <p>No {statusTab} {dutyTypeTab} duties.</p>
           {statusTab === "open" && (
-            <button onClick={() => navigate("/hospital/dashboard")}>
-              Post a {dutyTypeTab === "doctor" ? "Doctor" : "Nurse"} Locum
-            </button>
+            <button onClick={() => navigate("/hospital/dashboard")}>Post a Locum Duty</button>
           )}
         </div>
       ) : (
         <div className="duties-grid">
           {displayDuties.map((duty) => {
             const isNurse = duty.duty_type === "nurse";
-            const professional = isNurse ? duty.nurses : duty.doctors;
             return (
-              <div key={duty.id} className={`duty-card ${duty.completed ? "completed" : duty.booking_status === "confirmed" ? "confirmed" : duty.booked ? "booked" : ""} ${isNurse ? "nurse-card" : ""}`}>
+              <div key={duty.id} className={`duty-card ${duty.completed ? "completed" : duty.booking_status === "confirmed" ? "confirmed" : overview[duty.id]?.applicants ? "booked" : ""} ${isNurse ? "nurse-card" : ""}`}>
                 <div className="duty-header">
                   <h3>{duty.qualifications && duty.qualifications.length > 1 ? `${duty.qualifications.length} Qualifications` : duty.qualification}</h3>
-                  <span className="pay">Rs.{duty.gross_pay || duty.pay}</span>
+                  <span className="pay">Rs.{(duty.gross_pay || duty.pay || 0).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
                   <p>📅 {duty.date}</p>
@@ -214,30 +158,22 @@ function HospitalLocums() {
                   {duty.notes && <p>📝 {duty.notes}</p>}
                 </div>
                 {getStatusBadge(duty)}
-                {duty.booked && professional && (
-                  <div className="doctor-details">
-                    <h4>Booked {isNurse ? "Nurse" : "Doctor"}</h4>
-                    <p>👤 {isNurse ? "" : "Dr."} {professional.first_name} {professional.last_name}</p>
-                    <p>🎓 {professional.qualification}</p>
-                    <p>📞 {professional.phone}</p>
-                    <p>✉️ {professional.email}</p>
-                    <p>🏥 {professional.experience} years experience</p>
-                    <button className="view-doc-btn" onClick={() => viewDocument(professional.document_url)}>📄 View Certificate</button>
-                    {duty.booking_status !== "confirmed" && !duty.completed && (
-                      <div className="action-buttons">
-                        <button className="verify-btn" onClick={() => verifyBooking(duty.id)}>✅ Verify</button>
-                        <button className="reject-btn" onClick={() => rejectBooking(duty)}>❌ Reject</button>
-                      </div>
-                    )}
-                    {duty.booking_status === "confirmed" && !duty.completed && isPastDuty(duty.date) && (
-                      <button className="review-btn" onClick={() => { setReviewingDuty(duty); setReviewStatus(""); setReviewComment(""); }}>
-                        📝 Submit Review
-                      </button>
-                    )}
-                    {duty.completed && duty.review_comment && (
-                      <div className="review-note"><p>💬 {duty.review_comment}</p></div>
-                    )}
-                  </div>
+                {!duty.completed && (
+                  <DutyApplicants
+                    duty={duty}
+                    overview={overview[duty.id]}
+                    cover={coverByDuty[duty.id]}
+                    payer={{ name: hospital?.hospital_name, email: hospital?.email }}
+                    onChange={fetchDuties}
+                  />
+                )}
+                {duty.booking_status === "confirmed" && !duty.completed && isPastDuty(duty.date) && (
+                  <button className="review-btn" onClick={() => { setReviewingDuty(duty); setReviewStatus(""); setReviewComment(""); }}>
+                    📝 Submit Review
+                  </button>
+                )}
+                {duty.completed && duty.review_comment && (
+                  <div className="review-note"><p>💬 {duty.review_comment}</p></div>
                 )}
               </div>
             );
@@ -249,13 +185,7 @@ function HospitalLocums() {
         <div className="modal-overlay" onClick={() => setReviewingDuty(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2>Review Duty</h2>
-            <p style={{ color: "#888", marginBottom: 20 }}>
-              {(() => {
-                const isNurse = reviewingDuty.duty_type === "nurse";
-                const p = isNurse ? reviewingDuty.nurses : reviewingDuty.doctors;
-                return `${isNurse ? "" : "Dr."} ${p?.first_name} ${p?.last_name} — ${reviewingDuty.date}`;
-              })()}
-            </p>
+            <p style={{ color: "#888", marginBottom: 20 }}>{reviewingDuty.qualification} — {reviewingDuty.date}</p>
             <div className="review-options">
               {[
                 { value: "satisfactory", label: "✅ Satisfactory" },
