@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import {
+  fetchMyApplications, fetchOpenCoverRequests, applyToDuty, withdrawApplication,
+  applyForCover, withdrawCoverApplication,
+} from "../applications";
+import ApplyButton from "../ApplyButton";
 import "./NurseDashboard.css";
 
 const formatDate = (dateStr) => {
@@ -15,21 +20,19 @@ const formatDate = (dateStr) => {
 function TechnicianDashboard() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
+  const [coverRequests, setCoverRequests] = useState([]);
+  const [applications, setApplications] = useState({});
   const [loading, setLoading] = useState(true);
   const [techName, setTechName] = useState("");
   const [techQualification, setTechQualification] = useState("");
-  const [techId, setTechId] = useState(null);
-  const [booking, setBooking] = useState(null);
   const [searchDate, setSearchDate] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
-  const [myLockedDuty, setMyLockedDuty] = useState(null);
 
   useEffect(() => { fetchTechData(); }, []);
 
   const fetchTechData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-    setTechId(user.id);
     const { data: tech } = await supabase
       .from("technicians")
       .select("first_name, last_name, qualification, status")
@@ -38,29 +41,23 @@ function TechnicianDashboard() {
     if (!tech || tech.status !== "active") { navigate("/login"); return; }
     setTechName(`${tech.first_name} ${tech.last_name}`);
     setTechQualification(tech.qualification);
-    fetchDuties(tech.qualification, user.id);
-    fetchMyLockedDuty(user.id);
+    refresh(tech.qualification);
   };
 
-  const fetchMyLockedDuty = async (uid) => {
-    const { data } = await supabase
-      .from("locum_duties")
-      .select("*, hospitals(hospital_name, area)")
-      .eq("booked_by", uid)
-      .eq("booking_status", "locked")
-      .single();
-    setMyLockedDuty(data || null);
+  const refresh = (qualification = techQualification) => {
+    fetchDuties(qualification);
+    fetchMyApplications().then(setApplications);
+    fetchOpenCoverRequests().then(setCoverRequests);
   };
 
-  const fetchDuties = async (qualification, uid) => {
+  // Open duties only carry the area; the hospital is revealed once a booking is confirmed.
+  const fetchDuties = async (qualification) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("locum_duties")
-      .select("*, hospitals(hospital_name, area, address)")
+      .select("id, date, start_time, end_time, qualification, pay, gross_pay, notes, area")
       .eq("duty_type", "technician")
       .eq("qualification", qualification)
-      .eq("booked", false)
-      .eq("completed", false)
       .eq("booking_status", "open")
       .gte("date", new Date().toISOString().split("T")[0])
       .order("date", { ascending: true });
@@ -68,57 +65,12 @@ function TechnicianDashboard() {
     setLoading(false);
   };
 
-  const bookDuty = async (duty) => {
-    const confirmed = window.confirm(
-      `Accept this ${duty.qualification} duty at ${duty.hospitals?.area || "the hospital"} on ${formatDate(duty.date)}?\n\nThe hospital will be notified to confirm and pay the platform fee within 4 hours. Once confirmed, neither party can cancel.`
-    );
-    if (!confirmed) return;
-    setBooking(duty.id);
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const { data: latest } = await supabase.from("locum_duties").select("booked, booking_status").eq("id", duty.id).single();
-    if (latest?.booked || latest?.booking_status !== "open") {
-      alert("Sorry, this duty was just taken by someone else!");
-      setBooking(null);
-      fetchDuties(techQualification, techId);
-      return;
-    }
-
-    const { error } = await supabase.from("locum_duties")
-      .update({ booked: true, booked_by: user.id, booking_status: "locked", locked_at: new Date().toISOString() })
-      .eq("id", duty.id)
-      .eq("booked", false);
-
-    if (error) { alert("Error accepting duty: " + error.message); setBooking(null); return; }
-
-    await supabase.from("notifications").insert({
-      user_id: duty.hospital_id,
-      title: "🔒 Duty Accepted — Pay to Confirm",
-      message: `${techName} (${duty.qualification}) has accepted your duty on ${formatDate(duty.date)}. Pay the platform fee of Rs.${(duty.platform_fee || 0).toLocaleString()} within 4 hours to confirm.`,
-    });
-
-    alert("Duty accepted! Waiting for hospital to confirm payment. You'll be notified once confirmed.");
-    fetchDuties(techQualification, techId);
-    fetchMyLockedDuty(user.id);
-    setBooking(null);
-  };
-
   const logout = async () => { await supabase.auth.signOut(); navigate("/"); };
-
-  const getTimeRemaining = (lockedAt) => {
-    if (!lockedAt) return null;
-    const expiry = new Date(new Date(lockedAt).getTime() + 4 * 60 * 60 * 1000);
-    const diff = expiry - new Date();
-    if (diff <= 0) return "Expiring soon...";
-    const hours = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    return `${hours}h ${mins}m`;
-  };
 
   const filteredDuties = duties.filter(duty => {
     const matchesDate = searchDate ? duty.date === searchDate : true;
     const matchesLocation = searchLocation
-      ? duty.hospitals?.area?.toLowerCase().includes(searchLocation.toLowerCase())
+      ? duty.area?.toLowerCase().includes(searchLocation.toLowerCase())
       : true;
     return matchesDate && matchesLocation;
   });
@@ -137,17 +89,35 @@ function TechnicianDashboard() {
         </div>
       </div>
 
-      {myLockedDuty && (
-        <div style={{ background: "#fff8e1", border: "1px solid #f39c12", borderRadius: 10, padding: "14px 20px", margin: "0 0 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <p style={{ fontWeight: 700, color: "#795500", margin: 0, fontSize: 14 }}>🔒 Pending Confirmation</p>
-            <p style={{ color: "#795500", margin: "4px 0 0", fontSize: 13 }}>
-              {myLockedDuty.qualification} duty on {formatDate(myLockedDuty.date)} — awaiting hospital payment
-            </p>
+      {coverRequests.length > 0 && (
+        <div className="cover-requests-section">
+          <h2>🔄 Cover Needed</h2>
+          <p className="subtitle">A booked colleague can't make it. Apply to cover — the hospital confirms the replacement.</p>
+          <div className="duties-grid">
+            {coverRequests.map((cr) => (
+              <div key={cr.cover_request_id} className="duty-card cover-request-card">
+                <div className="cover-badge">Cover Needed</div>
+                <div className="duty-header">
+                  <h3>📍 {cr.area || "Bangalore"}</h3>
+                  <span className="pay">Rs.{(cr.pay || 0).toLocaleString()}</span>
+                </div>
+                <div className="duty-details">
+                  <p>📅 {formatDate(cr.date)}</p>
+                  <p>🕐 {cr.start_time} - {cr.end_time}</p>
+                  <p>🎓 {cr.qualification}</p>
+                  <p style={{ fontSize: 12, color: "#aaa", marginTop: 6 }}>Hospital name shared after confirmation</p>
+                </div>
+                <ApplyButton
+                  status={cr.my_application_status}
+                  label="Apply to Cover"
+                  confirmText={`Apply to cover the ${cr.qualification} duty in ${cr.area || "Bangalore"} on ${formatDate(cr.date)}?\n\nThe hospital reviews cover applicants and confirms one. If you're confirmed, you are responsible for attending.`}
+                  onApply={() => applyForCover(cr.cover_request_id)}
+                  onWithdraw={() => withdrawCoverApplication(cr.cover_request_id)}
+                  onDone={() => refresh()}
+                />
+              </div>
+            ))}
           </div>
-          <p style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, margin: 0 }}>
-            ⏰ {getTimeRemaining(myLockedDuty.locked_at)} left
-          </p>
         </div>
       )}
 
@@ -170,7 +140,7 @@ function TechnicianDashboard() {
             {filteredDuties.map((duty) => (
               <div key={duty.id} className="duty-card">
                 <div className="duty-header">
-                  <h3>📍 {duty.hospitals?.area || "Bangalore"}</h3>
+                  <h3>📍 {duty.area || "Bangalore"}</h3>
                   <span className="pay">Rs.{(duty.gross_pay || duty.pay).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
@@ -180,9 +150,13 @@ function TechnicianDashboard() {
                   {duty.notes && <p>📝 {duty.notes}</p>}
                   <p style={{ fontSize: 12, color: "#aaa", marginTop: 6 }}>Hospital name shared after confirmation</p>
                 </div>
-                <button className="book-btn" onClick={() => bookDuty(duty)} disabled={booking === duty.id || !!myLockedDuty}>
-                  {booking === duty.id ? "Accepting..." : myLockedDuty ? "Duty Pending" : "Accept Duty"}
-                </button>
+                <ApplyButton
+                  status={applications[duty.id]}
+                  confirmText={`Apply for this ${duty.qualification} duty in ${duty.area || "Bangalore"} on ${formatDate(duty.date)}?\n\nThe hospital reviews applicants and confirms one. You'll be notified if you're selected. Once confirmed, you are responsible for attending.`}
+                  onApply={() => applyToDuty(duty.id)}
+                  onWithdraw={() => withdrawApplication(duty.id)}
+                  onDone={() => refresh()}
+                />
               </div>
             ))}
           </div>

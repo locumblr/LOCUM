@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import {
+  fetchMyApplications, fetchOpenCoverRequests, applyToDuty, withdrawApplication,
+  applyForCover, withdrawCoverApplication,
+} from "../applications";
+import ApplyButton from "../ApplyButton";
 import "./DoctorDashboard.css";
 
 const formatDate = (dateStr) => {
@@ -31,27 +36,22 @@ function DoctorDashboard() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
   const [coverRequests, setCoverRequests] = useState([]);
+  const [applications, setApplications] = useState({});
   const [loading, setLoading] = useState(true);
   const [doctorName, setDoctorName] = useState("");
   const [doctorQualifications, setDoctorQualifications] = useState([]);
-  const [doctorId, setDoctorId] = useState(null);
-  const [booking, setBooking] = useState(null);
-  const [accepting, setAccepting] = useState(null);
   const [searchDate, setSearchDate] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
   const [showMenu, setShowMenu] = useState(false);
-  const [myLockedDuty, setMyLockedDuty] = useState(null);
   const [activeTab, setActiveTab] = useState("locum");
   const [consultations, setConsultations] = useState([]);
   const [consultLoading, setConsultLoading] = useState(false);
-  const [bookingConsult, setBookingConsult] = useState(null);
 
   useEffect(() => { fetchDoctorData(); }, []);
 
   const fetchDoctorData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/login"); return; }
-    setDoctorId(user.id);
     const { data: doctor } = await supabase
       .from("doctors")
       .select("first_name, last_name, qualification, additional_qualifications, status")
@@ -61,21 +61,15 @@ function DoctorDashboard() {
     setDoctorName(`${doctor.first_name} ${doctor.last_name}`);
     const qualifications = allQualifications(doctor);
     setDoctorQualifications(qualifications);
-    fetchDuties(qualifications, user.id);
-    fetchConsultations(qualifications, user.id);
-    fetchCoverRequests(qualifications, user.id);
-    fetchMyLockedDuty(user.id);
+    refresh(qualifications);
     subscribeToPush(doctor.qualification, user.id);
   };
 
-  const fetchMyLockedDuty = async (uid) => {
-    const { data } = await supabase
-      .from("locum_duties")
-      .select("*, hospitals(hospital_name, area)")
-      .eq("booked_by", uid)
-      .eq("booking_status", "locked")
-      .single();
-    setMyLockedDuty(data || null);
+  const refresh = (qualifications = doctorQualifications) => {
+    fetchDuties(qualifications);
+    fetchConsultations(qualifications);
+    fetchMyApplications().then(setApplications);
+    fetchOpenCoverRequests().then(setCoverRequests);
   };
 
   const subscribeToPush = async (qualification, uid) => {
@@ -94,15 +88,16 @@ function DoctorDashboard() {
     } catch (err) { console.error('Push subscription error:', err); }
   };
 
-  const fetchDuties = async (qualifications, uid) => {
+  // Open duties only carry the area; the hospital is revealed once a booking is confirmed.
+  const DUTY_COLUMNS = "id, date, start_time, end_time, qualification, qualifications, pay, gross_pay, notes, area, duty_type";
+
+  const fetchDuties = async (qualifications) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("locum_duties")
-      .select("*, hospitals(hospital_name, area, address)")
+      .select(DUTY_COLUMNS)
       .or(qualificationFilter(qualifications))
       .neq("duty_type", "consultation")
-      .eq("booked", false)
-      .eq("completed", false)
       .eq("booking_status", "open")
       .gte("date", new Date().toISOString().split("T")[0])
       .order("date", { ascending: true });
@@ -110,15 +105,13 @@ function DoctorDashboard() {
     setLoading(false);
   };
 
-  const fetchConsultations = async (qualifications, uid) => {
+  const fetchConsultations = async (qualifications) => {
     setConsultLoading(true);
     const { data, error } = await supabase
       .from("locum_duties")
-      .select("*, hospitals(hospital_name, area, address)")
+      .select(DUTY_COLUMNS)
       .eq("duty_type", "consultation")
       .or(qualificationFilter(qualifications))
-      .eq("booked", false)
-      .eq("completed", false)
       .eq("booking_status", "open")
       .gte("date", new Date().toISOString().split("T")[0])
       .order("date", { ascending: true });
@@ -133,128 +126,17 @@ function DoctorDashboard() {
     return "Evening (5pm–8pm)";
   };
 
-  const fetchCoverRequests = async (qualifications, userId) => {
-    const { data, error } = await supabase
-      .from("cover_requests")
-      .select("*, locum_duties(*, hospitals(hospital_name, area, address)), doctors(first_name, last_name)")
-      .eq("status", "open")
-      .neq("requesting_doctor_id", userId);
-    if (!error) {
-      const filtered = (data || []).filter(cr => qualifications.includes(cr.locum_duties?.qualification) || (cr.locum_duties?.qualifications || []).some(q => qualifications.includes(q)));
-      setCoverRequests(filtered);
-    }
-  };
-
-  const bookDuty = async (duty) => {
-    const confirmed = window.confirm(
-      `Accept this duty at ${duty.hospitals?.area || "the hospital"} on ${duty.date}?\n\nThe hospital will be notified to confirm and pay the platform fee within 4 hours. Once confirmed, neither party can cancel.`
-    );
-    if (!confirmed) return;
-    setBooking(duty.id);
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Race condition check
-    const { data: latest } = await supabase.from("locum_duties").select("booked, booking_status").eq("id", duty.id).single();
-    if (latest?.booked || latest?.booking_status !== "open") {
-      alert("Sorry, this duty was just taken by someone else!");
-      setBooking(null);
-      fetchDuties(doctorQualifications, doctorId);
-      return;
-    }
-
-    const { error } = await supabase.from("locum_duties")
-      .update({ booked: true, booked_by: user.id, booking_status: "locked", locked_at: new Date().toISOString() })
-      .eq("id", duty.id)
-      .eq("booked", false);
-
-    if (error) { alert("Error accepting duty: " + error.message); setBooking(null); return; }
-
-    // Notify hospital to pay
-    await supabase.from("notifications").insert({
-      user_id: duty.hospital_id,
-      title: "🔒 Duty Accepted — Pay to Confirm",
-      message: `Dr. ${doctorName} has accepted your ${duty.qualification} duty on ${duty.date}. Pay the platform fee of Rs.${(duty.platform_fee || 0).toLocaleString()} within 4 hours to confirm. After 4 hours the duty will be cancelled.`,
-    });
-
-    alert("Duty accepted! Waiting for hospital to confirm payment. You'll be notified once confirmed.");
-    fetchDuties(doctorQualifications, doctorId);
-    fetchMyLockedDuty(user.id);
-    setBooking(null);
-  };
-
-  const bookConsultation = async (duty) => {
-    const perConsult = duty.pay || 0;
-    const total = duty.gross_pay || perConsult * 3;
-    const confirmed = window.confirm(
-      `Accept this ${duty.qualification} consultation at ${duty.hospitals?.area || "the hospital"} on ${formatDate(duty.date)}?\n\nThis covers 3 consultations:\n1. Initial consult\n2. Review with investigations\n3. Discharge advice\n\nPer consult: Rs.${perConsult.toLocaleString()} | Total: Rs.${total.toLocaleString()}\n\nThe hospital will be notified to pay the platform fee within 4 hours.`
-    );
-    if (!confirmed) return;
-    setBookingConsult(duty.id);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: latest } = await supabase.from("locum_duties").select("booked, booking_status").eq("id", duty.id).single();
-    if (latest?.booked || latest?.booking_status !== "open") {
-      alert("Sorry, this consultation was just taken by someone else!");
-      setBookingConsult(null);
-      fetchConsultations(doctorQualifications, doctorId);
-      return;
-    }
-    const { error } = await supabase.from("locum_duties")
-      .update({ booked: true, booked_by: user.id, booking_status: "locked", locked_at: new Date().toISOString() })
-      .eq("id", duty.id).eq("booked", false);
-    if (error) { alert("Error accepting consultation: " + error.message); setBookingConsult(null); return; }
-    await supabase.from("notifications").insert({
-      user_id: duty.hospital_id,
-      title: "🔒 Consultation Accepted — Pay to Confirm",
-      message: `Dr. ${doctorName} has accepted the ${duty.qualification} consultation on ${formatDate(duty.date)} (3 sessions). Pay the platform fee of Rs.${(duty.platform_fee || 0).toLocaleString()} within 4 hours to confirm.`,
-    });
-    alert("Consultation accepted! Waiting for hospital to confirm payment. You'll be notified once confirmed.");
-    fetchConsultations(doctorQualifications, doctorId);
-    fetchMyLockedDuty(user.id);
-    setBookingConsult(null);
-  };
-
-  const acceptCover = async (coverRequest) => {
-    const confirmed = window.confirm(`Accept cover for duty at ${coverRequest.locum_duties?.hospitals?.area || "hospital"} on ${coverRequest.locum_duties?.date}?`);
-    if (!confirmed) return;
-    setAccepting(coverRequest.id);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: coveringDoctor } = await supabase.from("doctors").select("first_name, last_name").eq("id", user.id).single();
-    await supabase.from("cover_requests").update({ status: "accepted", covering_doctor_id: user.id }).eq("id", coverRequest.id);
-    const { error } = await supabase.from("locum_duties").update({
-      booked_by: user.id, booked: true, booking_status: "locked", locked_at: new Date().toISOString(),
-    }).eq("id", coverRequest.duty_id);
-    if (error) { alert("Error accepting cover: " + error.message); setAccepting(null); return; }
-    await supabase.from("notifications").insert({
-      user_id: coverRequest.locum_duties?.hospital_id,
-      title: "🔒 Cover Accepted — Pay to Confirm",
-      message: `Dr. ${coveringDoctor?.first_name} ${coveringDoctor?.last_name} has accepted cover for the ${coverRequest.locum_duties?.qualification} duty on ${coverRequest.locum_duties?.date}. Pay the platform fee to confirm.`,
-    });
-    alert("Cover accepted! Waiting for hospital to confirm payment.");
-    fetchDuties(doctorQualifications, doctorId);
-    fetchCoverRequests(doctorQualifications, doctorId);
-    fetchMyLockedDuty(doctorId);
-    setAccepting(null);
-  };
-
   const logout = async () => { await supabase.auth.signOut(); navigate("/"); };
-
-  const getTimeRemaining = (lockedAt) => {
-    if (!lockedAt) return null;
-    const expiry = new Date(new Date(lockedAt).getTime() + 4 * 60 * 60 * 1000);
-    const diff = expiry - new Date();
-    if (diff <= 0) return "Expiring soon...";
-    const hours = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    return `${hours}h ${mins}m`;
-  };
 
   const filteredDuties = duties.filter(duty => {
     const matchesDate = searchDate ? duty.date === searchDate : true;
     const matchesLocation = searchLocation
-      ? duty.hospitals?.area?.toLowerCase().includes(searchLocation.toLowerCase())
+      ? duty.area?.toLowerCase().includes(searchLocation.toLowerCase())
       : true;
     return matchesDate && matchesLocation;
   });
+
+  const appliedCount = Object.values(applications).filter(s => s === "applied").length;
 
   return (
     <div className="dashboard-container">
@@ -278,43 +160,39 @@ function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Locked duty banner */}
-      {myLockedDuty && (
-        <div style={{ background: "#fff8e1", border: "1px solid #f39c12", borderRadius: 10, padding: "14px 20px", margin: "0 0 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <p style={{ fontWeight: 700, color: "#795500", margin: 0, fontSize: 14 }}>🔒 Pending Confirmation</p>
-            <p style={{ color: "#795500", margin: "4px 0 0", fontSize: 13 }}>
-              {myLockedDuty.qualification} duty on {myLockedDuty.date} — awaiting hospital payment
-            </p>
-          </div>
-          <p style={{ color: "#e74c3c", fontSize: 13, fontWeight: 600, margin: 0 }}>
-            ⏰ {getTimeRemaining(myLockedDuty.locked_at)} left
-          </p>
+      {appliedCount > 0 && (
+        <div style={{ background: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: 10, padding: "12px 18px", margin: "0 0 20px", fontSize: 14, color: "#2e7d32" }}>
+          You have applied for <strong>{appliedCount}</strong> {appliedCount === 1 ? "duty" : "duties"}. We'll notify you when a hospital confirms you; confirmed duties appear in My Locums.
         </div>
       )}
 
       {coverRequests.length > 0 && (
         <div className="cover-requests-section">
-          <h2>🔄 Cover Requests</h2>
-          <p className="subtitle">A colleague needs cover — can you help?</p>
+          <h2>🔄 Cover Needed</h2>
+          <p className="subtitle">A booked colleague can't make it. Apply to cover — the hospital confirms the replacement.</p>
           <div className="duties-grid">
             {coverRequests.map((cr) => (
-              <div key={cr.id} className="duty-card cover-request-card">
+              <div key={cr.cover_request_id} className="duty-card cover-request-card">
                 <div className="cover-badge">Cover Needed</div>
                 <div className="duty-header">
-                  <h3>{cr.locum_duties?.hospitals?.area || "Hospital Area"}</h3>
-                  <span className="pay">Rs.{(cr.locum_duties?.gross_pay || cr.locum_duties?.pay || 0).toLocaleString()}</span>
+                  <h3>📍 {cr.area || "Bangalore"}</h3>
+                  <span className="pay">Rs.{(cr.pay || 0).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
-                  <p>📍 {cr.locum_duties?.hospitals?.area || "—"}</p>
-                  <p>📅 {formatDate(cr.locum_duties?.date)}</p>
-                  <p>🕐 {cr.locum_duties?.start_time} - {cr.locum_duties?.end_time}</p>
-                  <p>🎓 {cr.locum_duties?.qualification}</p>
-                  <p style={{ fontSize: 13, color: "#888" }}>Requested by Dr. {cr.doctors?.first_name} {cr.doctors?.last_name}</p>
+                  <p>📅 {formatDate(cr.date)}</p>
+                  <p>🕐 {cr.start_time} - {cr.end_time}</p>
+                  <p>🎓 {cr.qualification}</p>
+                  {cr.notes && <p>📝 {cr.notes}</p>}
+                  <p style={{ fontSize: 12, color: "#aaa", marginTop: 6 }}>Hospital name shared after confirmation</p>
                 </div>
-                <button className="book-btn" style={{ background: "#27ae60" }} onClick={() => acceptCover(cr)} disabled={accepting === cr.id}>
-                  {accepting === cr.id ? "Accepting..." : "✅ Accept Cover"}
-                </button>
+                <ApplyButton
+                  status={cr.my_application_status}
+                  label="Apply to Cover"
+                  confirmText={`Apply to cover the ${cr.qualification} duty in ${cr.area || "Bangalore"} on ${formatDate(cr.date)}?\n\nThe hospital reviews cover applicants and confirms one. If you're confirmed, you are responsible for attending.`}
+                  onApply={() => applyForCover(cr.cover_request_id)}
+                  onWithdraw={() => withdrawCoverApplication(cr.cover_request_id)}
+                  onDone={() => refresh()}
+                />
               </div>
             ))}
           </div>
@@ -349,7 +227,7 @@ function DoctorDashboard() {
       </div>
 
       {loading ? <p style={{ color: "#888" }}>Loading duties...</p> :
-        duties.length === 0 ? <p style={{ color: "#888" }}>No available duties matching your qualification at the moment.</p> :
+        duties.length === 0 ? <p style={{ color: "#888" }}>No available duties matching your qualifications at the moment.</p> :
         filteredDuties.length === 0 ? (
           <p style={{ color: "#888" }}>No duties match your filters. <span style={{ color: "#1e3a5f", cursor: "pointer" }} onClick={() => { setSearchDate(""); setSearchLocation(""); }}>Clear filters</span></p>
         ) : (
@@ -357,7 +235,7 @@ function DoctorDashboard() {
             {filteredDuties.map((duty) => (
               <div key={duty.id} className="duty-card">
                 <div className="duty-header">
-                  <h3>📍 {duty.hospitals?.area || "Bangalore"}</h3>
+                  <h3>📍 {duty.area || "Bangalore"}</h3>
                   <span className="pay">Rs.{(duty.gross_pay || duty.pay).toLocaleString()}</span>
                 </div>
                 <div className="duty-details">
@@ -367,9 +245,13 @@ function DoctorDashboard() {
                   {duty.notes && <p>📝 {duty.notes}</p>}
                   <p style={{ fontSize: 12, color: "#aaa", marginTop: 6 }}>Hospital name shared after confirmation</p>
                 </div>
-                <button className="book-btn" onClick={() => bookDuty(duty)} disabled={booking === duty.id || !!myLockedDuty}>
-                  {booking === duty.id ? "Accepting..." : myLockedDuty ? "Duty Pending" : "Accept Duty"}
-                </button>
+                <ApplyButton
+                  status={applications[duty.id]}
+                  confirmText={`Apply for this duty in ${duty.area || "Bangalore"} on ${formatDate(duty.date)}?\n\nThe hospital reviews applicants and confirms one. You'll be notified if you're selected. Once confirmed, you are responsible for attending.`}
+                  onApply={() => applyToDuty(duty.id)}
+                  onWithdraw={() => withdrawApplication(duty.id)}
+                  onDone={() => refresh()}
+                />
               </div>
             ))}
           </div>
@@ -388,7 +270,7 @@ function DoctorDashboard() {
                   In-Patient Consultation
                 </div>
                 <div className="duty-header">
-                  <h3>📍 {duty.hospitals?.area || "Bangalore"}</h3>
+                  <h3>📍 {duty.area || "Bangalore"}</h3>
                   <div style={{ textAlign: "right" }}>
                     <div className="pay" style={{ fontSize: 15 }}>Rs.{(duty.gross_pay || (duty.pay * 3)).toLocaleString()}</div>
                     <div style={{ fontSize: 11, color: "#888" }}>Rs.{(duty.pay || 0).toLocaleString()} × 3 sessions</div>
@@ -402,9 +284,13 @@ function DoctorDashboard() {
                   {duty.notes && <p>📝 {duty.notes}</p>}
                   <p style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>Hospital name shared after confirmation</p>
                 </div>
-                <button className="book-btn" onClick={() => bookConsultation(duty)} disabled={bookingConsult === duty.id || !!myLockedDuty}>
-                  {bookingConsult === duty.id ? "Accepting..." : myLockedDuty ? "Duty Pending" : "Accept Consultation"}
-                </button>
+                <ApplyButton
+                  status={applications[duty.id]}
+                  confirmText={`Apply for this ${duty.qualification} consultation in ${duty.area || "Bangalore"} on ${formatDate(duty.date)}?\n\nThis covers 3 sessions: initial consult, review with investigations, and discharge advice. The hospital reviews applicants and confirms one.`}
+                  onApply={() => applyToDuty(duty.id)}
+                  onWithdraw={() => withdrawApplication(duty.id)}
+                  onDone={() => refresh()}
+                />
               </div>
             ))}
           </div>
