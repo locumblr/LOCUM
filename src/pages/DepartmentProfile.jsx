@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { currentDepartment, signOutDepartment } from "../departmentSession";
 import "./Profile.css";
 
 function DepartmentProfile() {
@@ -10,9 +11,10 @@ function DepartmentProfile() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("dept_session");
-    if (!stored) { navigate("/department/login"); return; }
-    setSession(JSON.parse(stored));
+    currentDepartment().then(dept => {
+      if (!dept) { navigate("/department/login"); return; }
+      setSession(dept);
+    });
   }, []);
 
   const savePassword = async (e) => {
@@ -20,18 +22,17 @@ function DepartmentProfile() {
     if (password.newPass !== password.confirm) { alert("Passwords do not match!"); return; }
     if (password.newPass.length < 6) { alert("Password must be at least 6 characters."); return; }
     setSaving(true);
-    const { error } = await supabase
-      .from("hospital_departments")
-      .update({ password: password.newPass })
-      .eq("id", session.id);
+    const { error } = await supabase.rpc("set_department_password", {
+      p_department_id: session.id, p_new_password: password.newPass,
+    });
     if (error) { alert("Error: " + error.message); setSaving(false); return; }
     alert("Password changed successfully!");
     setPassword({ newPass: "", confirm: "" });
     setSaving(false);
   };
 
-  const logout = () => {
-    localStorage.removeItem("dept_session");
+  const logout = async () => {
+    await signOutDepartment();
     navigate("/department/login");
   };
 

@@ -187,7 +187,8 @@ function Profile() {
 
   const updateDeptPassword = async (deptId, newPass) => {
     if (!newPass || newPass.length < 6) { alert("Password must be at least 6 characters."); return; }
-    await supabase.from("hospital_departments").update({ password: newPass }).eq("id", deptId);
+    const { error } = await supabase.rpc("set_department_password", { p_department_id: deptId, p_new_password: newPass });
+    if (error) { alert(error.message); return; }
     alert("Password updated!");
     fetchDepartments();
   };
@@ -196,17 +197,9 @@ function Profile() {
     e.preventDefault();
     if (!newDept.name.trim()) return;
     setAddingDept(true);
-    const codePrefix = personal.hospitalName.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
-    const deptCode = `${codePrefix}-${newDept.name.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 8)}`;
-    const { error } = await supabase.from("hospital_departments").insert({
-      hospital_id: userId,
-      department_name: newDept.name,
-      department_code: deptCode,
-      password: "123456",
-      fixed_pay: 0,
-    });
+    const { data, error } = await supabase.rpc("add_department", { p_name: newDept.name });
     if (error) { alert("Error: " + error.message); setAddingDept(false); return; }
-    alert(`Department added!\nCode: ${deptCode}\nDefault password: 123456`);
+    alert(`Department added!\nCode: ${data?.[0]?.department_code}\nDefault password: 123456 — ask the department to change it after their first login.`);
     setNewDept({ name: "" });
     fetchDepartments();
     setAddingDept(false);
@@ -218,16 +211,7 @@ function Profile() {
     await supabase.from("monthly_invoices").update({
       payment_requested: true,
       payment_requested_at: new Date().toISOString(),
-      status: "payment_requested",
     }).eq("id", pendingInvoice.id);
-    const { data: admins } = await supabase.from("admins").select("id");
-    for (const admin of admins || []) {
-      await supabase.from("notifications").insert({
-        user_id: admin.id,
-        title: "💰 Payment Received — Verification Required",
-        message: `${hospitalName} has marked their invoice as paid. Total: Rs.${pendingInvoice.total_due?.toLocaleString()}. Please verify and mark as cleared.`,
-      });
-    }
     alert("Payment marked! Admin has been notified and will verify shortly.");
     fetchInvoices(userId);
     setMarkingPaid(false);
@@ -248,14 +232,6 @@ function Profile() {
       const newEntry = `${additionalQual.degree}||${fileName}`;
       const updated = [...additionalQuals, newEntry];
       await supabase.from(table).update({ additional_qualifications: updated }).eq("id", user.id);
-      const { data: admins } = await supabase.from("admins").select("id");
-      for (const admin of admins || []) {
-        await supabase.from("notifications").insert({
-          user_id: admin.id,
-          title: "📋 New Qualification Added",
-          message: `${role === "doctor" ? `Dr. ${personal.firstName} ${personal.lastName}` : `${personal.firstName} ${personal.lastName}`} has added a new qualification: ${additionalQual.degree}.`,
-        });
-      }
       setAdditionalQuals(updated);
       alert("Qualification added! You will now also see duties that require it.");
       setAdditionalQual({ degree: "", certificate: null });
@@ -374,11 +350,21 @@ function Profile() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     if (role === "doctor" || role === "nurse") {
-      const { data } = await supabase.from("locum_duties").select("*, hospitals(hospital_name, address)").eq("booked_by", user.id).order("date", { ascending: false });
-      setDutyHistory(data || []);
+      const [{ data }, { data: bookings }] = await Promise.all([
+        supabase.from("locum_duties").select("*").eq("booked_by", user.id).order("date", { ascending: false }),
+        supabase.rpc("get_my_bookings"),
+      ]);
+      const byDuty = Object.fromEntries((bookings || []).map(b => [b.duty_id, b]));
+      setDutyHistory((data || []).map(d => ({
+        ...d, hospitals: { hospital_name: byDuty[d.id]?.hospital_name, address: byDuty[d.id]?.address },
+      })));
     } else if (role === "hospital") {
-      const { data } = await supabase.from("locum_duties").select("*, doctors(first_name, last_name), nurses(first_name, last_name)").eq("hospital_id", user.id).order("date", { ascending: false });
-      setDutyHistory(data || []);
+      const [{ data }, { data: names }] = await Promise.all([
+        supabase.from("locum_duties").select("*").eq("hospital_id", user.id).order("date", { ascending: false }),
+        supabase.rpc("get_booked_names"),
+      ]);
+      const nameByDuty = Object.fromEntries((names || []).map(n => [n.duty_id, n.name]));
+      setDutyHistory((data || []).map(d => ({ ...d, booked_name: nameByDuty[d.id] })));
     }
     setHistoryLoading(false);
   };
@@ -431,10 +417,7 @@ function Profile() {
     return <span className="history-badge open">Open</span>;
   };
 
-  const getStaffName = (duty) => {
-    if (duty.duty_type === "nurse") return duty.nurses ? `${duty.nurses.first_name} ${duty.nurses.last_name}` : "—";
-    return duty.doctors ? `Dr. ${duty.doctors.first_name} ${duty.doctors.last_name}` : "—";
-  };
+  const getStaffName = (duty) => duty.booked_name || "—";
 
   const completedDuties = dutyHistory.filter(d => d.completed);
   const upcomingDuties = dutyHistory.filter(d => !d.completed && d.booking_status === "confirmed");
@@ -709,7 +692,7 @@ function Profile() {
       {activeTab === "departments" && role === "hospital" && (
         <div className="history-section">
           <div style={{ background: "#e3f2fd", borderRadius: 10, padding: 16, marginBottom: 24, fontSize: 14, color: "#1565c0" }}>
-            ℹ️ Department accounts can post locum duties, manage bookings and submit reviews. They cannot see any financial information. Default password is <strong>123456</strong>. Login at <strong>/department/login</strong>.
+            ℹ️ Department accounts can post locum duties, manage bookings and submit reviews. They cannot see any financial information. New departments start with password <strong>123456</strong>; ask each department to change it after their first login. Login at <strong>/department/login</strong>.
           </div>
           <form onSubmit={addDepartment} style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             <input

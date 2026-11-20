@@ -60,7 +60,7 @@ function ApplicantRow({ a, actionLabel, onAction, busy }) {
   );
 }
 
-function DutyApplicants({ duty, overview, cover, payer, onChange }) {
+function DutyApplicants({ duty, overview, cover, payer, canPay = true, onChange }) {
   const [applicants, setApplicants] = useState(null);
   const [coverApplicants, setCoverApplicants] = useState(null);
   const [booked, setBooked] = useState(null);
@@ -174,9 +174,13 @@ function DutyApplicants({ duty, overview, cover, payer, onChange }) {
           Pay the platform fee to see names, registration numbers and certificates. You then have 24 hours (or until the duty starts) to select one.
           If none is suitable you can ask for a review; the fee is refunded only if our team finds a valid reason.
         </p>
-        <button style={primaryBtn} disabled={busy} onClick={pay}>
-          {busy ? "Opening payment..." : `💳 Pay Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST) to view applicants`}
-        </button>
+        {canPay ? (
+          <button style={primaryBtn} disabled={busy} onClick={pay}>
+            {busy ? "Opening payment..." : `💳 Pay Rs.${(duty.platform_fee || 0).toLocaleString()} (incl. GST) to view applicants`}
+          </button>
+        ) : (
+          <p style={{ color: "#795500", margin: 0, fontWeight: 600 }}>Your hospital's main account pays the platform fee to unlock these applicants. Once paid, you can review and select here.</p>
+        )}
       </div>
     );
   }

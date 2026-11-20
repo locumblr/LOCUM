@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { signInDepartment } from "../departmentSession";
 import "./Login.css";
 import logo from "../assets/logo.png";
 
@@ -53,20 +54,8 @@ function Login() {
     setLoading(true);
     try {
       if (isDepartmentCode(form.identifier)) {
-        const { data: dept, error: deptError } = await supabase
-          .from("hospital_departments")
-          .select("*, hospitals(status, hospital_name)")
-          .eq("department_code", form.identifier.toUpperCase().trim())
-          .single();
-        if (deptError || !dept) { setError("Invalid department code. Please check and try again."); setLoading(false); return; }
-        if (dept.password !== form.password) { setError("Incorrect password. Default password is 123456."); setLoading(false); return; }
-        if (dept.hospitals?.status === "frozen") { setError("This hospital account is currently suspended."); setLoading(false); return; }
-        if (dept.hospitals?.status !== "active") { setError("This hospital account is not yet active."); setLoading(false); return; }
-        localStorage.setItem("dept_session", JSON.stringify({
-          id: dept.id, hospital_id: dept.hospital_id,
-          department_name: dept.department_name, department_code: dept.department_code,
-          fixed_pay: dept.fixed_pay, hospital_name: dept.hospitals?.hospital_name,
-        }));
+        const { error: deptError } = await signInDepartment(form.identifier, form.password);
+        if (deptError) { setError(deptError); setLoading(false); return; }
         navigate("/department/dashboard");
         return;
       }

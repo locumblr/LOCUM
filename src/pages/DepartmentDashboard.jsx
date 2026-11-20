@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import DutyApplicants from "../DutyApplicants";
+import { currentDepartment, signOutDepartment } from "../departmentSession";
 import "./HospitalDashboard.css";
 
 const allQualifications = [
@@ -54,23 +56,27 @@ function DepartmentDashboard() {
   const [reviewingDuty, setReviewingDuty] = useState(null);
   const [reviewStatus, setReviewStatus] = useState("");
   const [reviewComment, setReviewComment] = useState("");
+  const [overview, setOverview] = useState({});
+  const [coverByDuty, setCoverByDuty] = useState({});
 
   useEffect(() => {
-    const stored = localStorage.getItem("dept_session");
-    if (!stored) { navigate("/department/login"); return; }
-    const s = JSON.parse(stored);
-    setSession(s);
-    fetchDuties(s);
+    currentDepartment().then(dept => {
+      if (!dept) { navigate("/department/login"); return; }
+      setSession(dept);
+      fetchDuties(dept);
+    });
   }, []);
 
   const fetchDuties = async (s) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("locum_duties")
-      .select("*")
-      .eq("department_id", s.id)
-      .order("date", { ascending: false });
+    const [{ data, error }, { data: ov }, { data: covers }] = await Promise.all([
+      supabase.from("locum_duties").select("*").eq("department_id", s.id).order("date", { ascending: false }),
+      supabase.rpc("get_duty_overview"),
+      supabase.rpc("get_hospital_cover_requests"),
+    ]);
     if (!error) setDuties(data || []);
+    setOverview(Object.fromEntries((ov || []).map(o => [o.duty_id, o])));
+    setCoverByDuty(Object.fromEntries((covers || []).map(c => [c.duty_id, c])));
     setLoading(false);
   };
 
@@ -122,7 +128,7 @@ function DepartmentDashboard() {
           body: {
             qualification: q,
             title: "New Locum Duty Available!",
-            body: `New duty at ${session.hospital_name} on ${form.date}. Rs.${doctorPay.toLocaleString()}`,
+            body: `New duty on ${form.date}. Rs.${doctorPay.toLocaleString()}`,
             url: showForm === "nurse" ? "/nurse/dashboard" : "/doctor/dashboard",
           },
         });
@@ -136,65 +142,15 @@ function DepartmentDashboard() {
     setSubmitting(false);
   };
 
-  const viewDocument = async (documentUrl) => {
-    if (!documentUrl) { alert("No document uploaded."); return; }
-    const { data, error } = await supabase.storage.from("documents").createSignedUrl(documentUrl, 60);
-    if (error) { alert("Error: " + error.message); return; }
-    window.open(data.signedUrl, "_blank");
-  };
-
-  const verifyBooking = async (dutyId) => {
-    const confirmed = window.confirm("Confirm that you have verified this professional's credentials and approve them for this duty?");
-    if (!confirmed) return;
-    await supabase.from("locum_duties").update({ booking_status: "confirmed" }).eq("id", dutyId);
-    fetchDuties(session);
-  };
-
-  const rejectBooking = async (duty) => {
-    const reason = window.prompt("Please provide a reason for rejecting this professional:");
-    if (!reason) return;
-    const isNurse = duty.duty_type === "nurse";
-    const professional = isNurse ? duty.nurses : duty.doctors;
-    if (professional) {
-      await supabase.from(isNurse ? "nurses" : "doctors").update({
-        flagged: true,
-        flag_reason: reason,
-        flagged_by: `${session.hospital_name} — ${session.department_name}`,
-      }).eq("id", professional.id);
-    }
-    await supabase.from("locum_duties").update({
-      booking_status: "open",
-      booked: false,
-      booked_by: null,
-    }).eq("id", duty.id);
-    fetchDuties(session);
-  };
-
   const submitReview = async () => {
     if (!reviewStatus) { alert("Please select a review status."); return; }
     if (reviewStatus !== "satisfactory" && !reviewComment) {
       alert("Please provide a comment."); return;
     }
-    await supabase.from("locum_duties").update({
-      review_status: reviewStatus,
-      review_comment: reviewComment,
-      reviewed_at: new Date().toISOString(),
-      completed: true,
-    }).eq("id", reviewingDuty.id);
-    if (reviewStatus !== "satisfactory") {
-      const isNurse = reviewingDuty.duty_type === "nurse";
-      const professional = isNurse ? reviewingDuty.nurses : reviewingDuty.doctors;
-      const flagReason = reviewStatus === "late" ? "Late to duty" :
-        reviewStatus === "absent" ? "Absent from duty" :
-        `Unsatisfactory: ${reviewComment}`;
-      if (professional) {
-        await supabase.from(isNurse ? "nurses" : "doctors").update({
-          flagged: true,
-          flag_reason: flagReason,
-          flagged_by: `${session.hospital_name} — ${session.department_name}`,
-        }).eq("id", professional.id);
-      }
-    }
+    const { error } = await supabase.rpc("submit_duty_review", {
+      p_duty_id: reviewingDuty.id, p_status: reviewStatus, p_comment: reviewComment,
+    });
+    if (error) { alert(error.message); return; }
     alert("Review submitted!");
     setReviewingDuty(null);
     setReviewStatus("");
@@ -202,8 +158,8 @@ function DepartmentDashboard() {
     fetchDuties(session);
   };
 
-  const logout = () => {
-    localStorage.removeItem("dept_session");
+  const logout = async () => {
+    await signOutDepartment();
     navigate("/department/login");
   };
 
@@ -215,7 +171,8 @@ function DepartmentDashboard() {
       return <div className={`status-badge review-${duty.review_status}`}>{labels[duty.review_status] || "✅ Completed"}</div>;
     }
     if (duty.booking_status === "confirmed") return <div className="status-badge status-confirmed">✅ Confirmed</div>;
-    if (duty.booking_status === "pending_verification" || duty.booked) return <div className="status-badge status-pending">⏳ Pending Verification</div>;
+    if (duty.booking_status === "expired") return <div className="status-badge" style={{ background: "#f5f5f5", color: "#999" }}>Closed</div>;
+    if (overview[duty.id]?.paid) return <div className="status-badge status-pending">Paid — select an applicant</div>;
     return <div className="status-badge status-open">Open</div>;
   };
 
@@ -331,9 +288,8 @@ function DepartmentDashboard() {
           ) : (
             (activeTab === "active" ? activeDuties : completedDuties).map(duty => {
               const isNurse = duty.duty_type === "nurse";
-              const professional = isNurse ? duty.nurses : duty.doctors;
               return (
-                <div key={duty.id} className={`duty-card ${duty.completed ? "completed" : duty.booking_status === "confirmed" ? "confirmed" : duty.booked ? "booked" : ""} ${isNurse ? "nurse-card" : ""}`}>
+                <div key={duty.id} className={`duty-card ${duty.completed ? "completed" : duty.booking_status === "confirmed" ? "confirmed" : overview[duty.id]?.applicants ? "booked" : ""} ${isNurse ? "nurse-card" : ""}`}>
                   <div className="duty-header">
                     <h3>{duty.qualifications?.length > 1 ? `${duty.qualifications.length} Qualifications` : duty.qualification}</h3>
                   </div>
@@ -343,26 +299,19 @@ function DepartmentDashboard() {
                     {duty.notes && <p>📝 {duty.notes}</p>}
                   </div>
                   {getStatusBadge(duty)}
-                  {duty.booked && professional && (
-                    <div className="doctor-details">
-                      <h4>Booked {isNurse ? "Nurse" : "Doctor"}</h4>
-                      <p>👤 {isNurse ? "" : "Dr."} {professional.first_name} {professional.last_name}</p>
-                      <p>🎓 {professional.qualification}</p>
-                      <p>📞 {professional.phone}</p>
-                      <p>✉️ {professional.email}</p>
-                      <button className="view-doc-btn" onClick={() => viewDocument(professional.document_url)}>📄 View Certificate</button>
-                      {duty.booking_status !== "confirmed" && !duty.completed && (
-                        <div className="action-buttons">
-                          <button className="verify-btn" onClick={() => verifyBooking(duty.id)}>✅ Verify</button>
-                          <button className="reject-btn" onClick={() => rejectBooking(duty)}>❌ Reject</button>
-                        </div>
-                      )}
-                      {duty.booking_status === "confirmed" && !duty.completed && isPastDuty(duty.date) && (
-                        <button className="review-btn" onClick={() => { setReviewingDuty(duty); setReviewStatus(""); setReviewComment(""); }}>
-                          📝 Submit Review
-                        </button>
-                      )}
-                    </div>
+                  {!duty.completed && (
+                    <DutyApplicants
+                      duty={duty}
+                      overview={overview[duty.id]}
+                      cover={coverByDuty[duty.id]}
+                      canPay={false}
+                      onChange={() => fetchDuties(session)}
+                    />
+                  )}
+                  {duty.booking_status === "confirmed" && !duty.completed && isPastDuty(duty.date) && (
+                    <button className="review-btn" onClick={() => { setReviewingDuty(duty); setReviewStatus(""); setReviewComment(""); }}>
+                      📝 Submit Review
+                    </button>
                   )}
                 </div>
               );
@@ -376,7 +325,7 @@ function DepartmentDashboard() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2>Review Duty</h2>
             <p style={{ color: "#888", marginBottom: 20 }}>
-              {reviewingDuty.duty_type === "nurse" ? reviewingDuty.nurses?.first_name : `Dr. ${reviewingDuty.doctors?.first_name}`} — {reviewingDuty.date}
+              {reviewingDuty.qualification} — {reviewingDuty.date}
             </p>
             <div className="review-options">
               {[

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supabaseClient";
+import { signInDepartment } from "../departmentSession";
 import "./Login.css";
 import logo from "../assets/logo.png";
 
@@ -16,49 +16,10 @@ function DepartmentLogin() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-    const { data: dept, error: deptError } = await supabase
-      .from("hospital_departments")
-      .select("*, hospitals(status, hospital_name)")
-      .eq("department_code", form.code.toUpperCase().trim())
-      .single();
-
-    if (deptError || !dept) {
-      setError("Invalid department code. Please check and try again.");
-      setLoading(false);
-      return;
-    }
-
-    if (dept.password !== form.password) {
-      setError("Incorrect password. Default password is 123456.");
-      setLoading(false);
-      return;
-    }
-
-    if (dept.hospitals?.status === "frozen") {
-      setError("This hospital account is currently suspended. Please contact support.");
-      setLoading(false);
-      return;
-    }
-
-    if (dept.hospitals?.status !== "active") {
-      setError("This hospital account is not yet active.");
-      setLoading(false);
-      return;
-    }
-
-    // Store department session in localStorage
-    localStorage.setItem("dept_session", JSON.stringify({
-      id: dept.id,
-      hospital_id: dept.hospital_id,
-      department_name: dept.department_name,
-      department_code: dept.department_code,
-      fixed_pay: dept.fixed_pay,
-      hospital_name: dept.hospitals?.hospital_name,
-    }));
-
-    navigate("/department/dashboard");
+    const { error: signInError } = await signInDepartment(form.code, form.password);
     setLoading(false);
+    if (signInError) { setError(signInError); return; }
+    navigate("/department/dashboard");
   };
 
   return (
@@ -71,7 +32,7 @@ function DepartmentLogin() {
         <input
           name="code"
           type="text"
-          placeholder="Department Code (e.g. APOLLO-ICU)"
+          placeholder="Department Code (e.g. APOLLO-ICU-7KQ2)"
           required
           onChange={handle}
           value={form.code}
@@ -80,7 +41,7 @@ function DepartmentLogin() {
         <input
           name="password"
           type="password"
-          placeholder="Password (default: 123456)"
+          placeholder="Password"
           required
           onChange={handle}
           value={form.password}
