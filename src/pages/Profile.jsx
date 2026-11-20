@@ -252,12 +252,12 @@ function Profile() {
       for (const admin of admins || []) {
         await supabase.from("notifications").insert({
           user_id: admin.id,
-          title: "📋 New Qualification Added — Verification Required",
-          message: `${role === "doctor" ? `Dr. ${personal.firstName} ${personal.lastName}` : `${personal.firstName} ${personal.lastName}`} has added a new qualification: ${additionalQual.degree}. Please verify the certificate.`,
+          title: "📋 New Qualification Added",
+          message: `${role === "doctor" ? `Dr. ${personal.firstName} ${personal.lastName}` : `${personal.firstName} ${personal.lastName}`} has added a new qualification: ${additionalQual.degree}.`,
         });
       }
       setAdditionalQuals(updated);
-      alert("Qualification submitted! Admin will verify your certificate shortly.");
+      alert("Qualification added! You will now also see duties that require it.");
       setAdditionalQual({ degree: "", certificate: null });
     } catch (err) {
       alert("Error: " + err.message);
@@ -568,7 +568,7 @@ function Profile() {
       {activeTab === "additional" && (role === "doctor" || role === "nurse") && (
         <div className="history-section">
           <div style={{ background: "#e8f5e9", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#2e7d32", lineHeight: 1.6 }}>
-            ✅ Add additional degrees or qualifications here. Each one must be verified by admin before hospitals can see it. Your registration number covers all qualifications.
+            ✅ Add additional degrees or qualifications here. Each one you add lets you see and apply for duties that require it. Hospitals review your certificates before confirming a booking.
           </div>
 
           {additionalQuals.length > 0 && (
@@ -617,7 +617,7 @@ function Profile() {
               )}
             </div>
             <button type="submit" className="save-btn" disabled={addingQual}>
-              {addingQual ? "Uploading..." : "Submit for Verification"}
+              {addingQual ? "Uploading..." : "Add Qualification"}
             </button>
           </form>
         </div>

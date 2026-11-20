@@ -48,7 +48,7 @@ function Landing() {
             </div>
             <div className="hero-stat">
               <h3>Trusted</h3>
-              <p>All credentials verified</p>
+              <p>Credentials checked by hospitals</p>
             </div>
             <div className="hero-stat">
               <h3>Flexible</h3>
@@ -66,7 +66,7 @@ function Landing() {
             <div className="step-card">
               <div className="step-number">01</div>
               <h3>Register</h3>
-              <p>Create your account as a doctor, nurse, technician, or hospital. Credentials are verified before you go live.</p>
+              <p>Create your account as a doctor, nurse, technician, or hospital. Hospitals are verified by our team; professionals can start applying straight away.</p>
             </div>
             <div className="step-card">
               <div className="step-number">02</div>
@@ -86,7 +86,7 @@ function Landing() {
         <div className="section-inner">
           <div className="section-label">For Doctors</div>
           <h2>Your time, your terms.</h2>
-          <p>Browse locum duties and specialist consultation slots that match your qualification. Book instantly, get verified, and show up. No middlemen, no phone calls.</p>
+          <p>Browse locum duties and specialist consultation slots that match your qualification. Apply in a tap, get confirmed, and show up. No middlemen, no phone calls.</p>
           <ul className="feature-list">
             <li>✅ Instant registration and activation</li>
             <li>✅ Duties matched to your qualification</li>

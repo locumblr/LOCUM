@@ -12,13 +12,28 @@ const formatDate = (dateStr) => {
   return `${monthName} ${day}${suffix}, ${year}`;
 };
 
+// Every qualification a doctor holds: the main one plus any added on their profile
+// (stored as "degree||certificatePath").
+const allQualifications = (doctor) => [
+  doctor.qualification,
+  ...(doctor.additional_qualifications || []).map(q => q.split("||")[0]),
+].filter(Boolean);
+
+// PostgREST filter matching duties that accept any of the given qualifications.
+// Values are quoted because qualification names contain brackets and commas,
+// which otherwise break the filter and silently return no duties.
+const qualificationFilter = (qualifications) => {
+  const list = qualifications.map(q => `"${q.replace(/"/g, '\\"')}"`).join(",");
+  return `qualification.in.(${list}),qualifications.ov.{${list}}`;
+};
+
 function DoctorDashboard() {
   const navigate = useNavigate();
   const [duties, setDuties] = useState([]);
   const [coverRequests, setCoverRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [doctorName, setDoctorName] = useState("");
-  const [doctorQualification, setDoctorQualification] = useState("");
+  const [doctorQualifications, setDoctorQualifications] = useState([]);
   const [doctorId, setDoctorId] = useState(null);
   const [booking, setBooking] = useState(null);
   const [accepting, setAccepting] = useState(null);
@@ -39,15 +54,16 @@ function DoctorDashboard() {
     setDoctorId(user.id);
     const { data: doctor } = await supabase
       .from("doctors")
-      .select("first_name, last_name, qualification, status")
+      .select("first_name, last_name, qualification, additional_qualifications, status")
       .eq("id", user.id)
       .single();
     if (!doctor || doctor.status !== "active") { navigate("/login"); return; }
     setDoctorName(`${doctor.first_name} ${doctor.last_name}`);
-    setDoctorQualification(doctor.qualification);
-    fetchDuties(doctor.qualification, user.id);
-    fetchConsultations(doctor.qualification, user.id);
-    fetchCoverRequests(doctor.qualification, user.id);
+    const qualifications = allQualifications(doctor);
+    setDoctorQualifications(qualifications);
+    fetchDuties(qualifications, user.id);
+    fetchConsultations(qualifications, user.id);
+    fetchCoverRequests(qualifications, user.id);
     fetchMyLockedDuty(user.id);
     subscribeToPush(doctor.qualification, user.id);
   };
@@ -78,12 +94,12 @@ function DoctorDashboard() {
     } catch (err) { console.error('Push subscription error:', err); }
   };
 
-  const fetchDuties = async (qualification, uid) => {
+  const fetchDuties = async (qualifications, uid) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("locum_duties")
       .select("*, hospitals(hospital_name, area, address)")
-      .or(`qualification.eq.${qualification},qualifications.cs.{${qualification}}`)
+      .or(qualificationFilter(qualifications))
       .neq("duty_type", "consultation")
       .eq("booked", false)
       .eq("completed", false)
@@ -94,13 +110,13 @@ function DoctorDashboard() {
     setLoading(false);
   };
 
-  const fetchConsultations = async (qualification, uid) => {
+  const fetchConsultations = async (qualifications, uid) => {
     setConsultLoading(true);
     const { data, error } = await supabase
       .from("locum_duties")
       .select("*, hospitals(hospital_name, area, address)")
       .eq("duty_type", "consultation")
-      .or(`qualification.eq.${qualification},qualifications.cs.{${qualification}}`)
+      .or(qualificationFilter(qualifications))
       .eq("booked", false)
       .eq("completed", false)
       .eq("booking_status", "open")
@@ -117,14 +133,14 @@ function DoctorDashboard() {
     return "Evening (5pm–8pm)";
   };
 
-  const fetchCoverRequests = async (qualification, userId) => {
+  const fetchCoverRequests = async (qualifications, userId) => {
     const { data, error } = await supabase
       .from("cover_requests")
       .select("*, locum_duties(*, hospitals(hospital_name, area, address)), doctors(first_name, last_name)")
       .eq("status", "open")
       .neq("requesting_doctor_id", userId);
     if (!error) {
-      const filtered = (data || []).filter(cr => cr.locum_duties?.qualification === qualification);
+      const filtered = (data || []).filter(cr => qualifications.includes(cr.locum_duties?.qualification) || (cr.locum_duties?.qualifications || []).some(q => qualifications.includes(q)));
       setCoverRequests(filtered);
     }
   };
@@ -142,7 +158,7 @@ function DoctorDashboard() {
     if (latest?.booked || latest?.booking_status !== "open") {
       alert("Sorry, this duty was just taken by someone else!");
       setBooking(null);
-      fetchDuties(doctorQualification, doctorId);
+      fetchDuties(doctorQualifications, doctorId);
       return;
     }
 
@@ -161,7 +177,7 @@ function DoctorDashboard() {
     });
 
     alert("Duty accepted! Waiting for hospital to confirm payment. You'll be notified once confirmed.");
-    fetchDuties(doctorQualification, doctorId);
+    fetchDuties(doctorQualifications, doctorId);
     fetchMyLockedDuty(user.id);
     setBooking(null);
   };
@@ -179,7 +195,7 @@ function DoctorDashboard() {
     if (latest?.booked || latest?.booking_status !== "open") {
       alert("Sorry, this consultation was just taken by someone else!");
       setBookingConsult(null);
-      fetchConsultations(doctorQualification, doctorId);
+      fetchConsultations(doctorQualifications, doctorId);
       return;
     }
     const { error } = await supabase.from("locum_duties")
@@ -192,7 +208,7 @@ function DoctorDashboard() {
       message: `Dr. ${doctorName} has accepted the ${duty.qualification} consultation on ${formatDate(duty.date)} (3 sessions). Pay the platform fee of Rs.${(duty.platform_fee || 0).toLocaleString()} within 4 hours to confirm.`,
     });
     alert("Consultation accepted! Waiting for hospital to confirm payment. You'll be notified once confirmed.");
-    fetchConsultations(doctorQualification, doctorId);
+    fetchConsultations(doctorQualifications, doctorId);
     fetchMyLockedDuty(user.id);
     setBookingConsult(null);
   };
@@ -214,8 +230,8 @@ function DoctorDashboard() {
       message: `Dr. ${coveringDoctor?.first_name} ${coveringDoctor?.last_name} has accepted cover for the ${coverRequest.locum_duties?.qualification} duty on ${coverRequest.locum_duties?.date}. Pay the platform fee to confirm.`,
     });
     alert("Cover accepted! Waiting for hospital to confirm payment.");
-    fetchDuties(doctorQualification, doctorId);
-    fetchCoverRequests(doctorQualification, doctorId);
+    fetchDuties(doctorQualifications, doctorId);
+    fetchCoverRequests(doctorQualifications, doctorId);
     fetchMyLockedDuty(doctorId);
     setAccepting(null);
   };

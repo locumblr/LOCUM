@@ -162,22 +162,23 @@ function DoctorForm({ navigate }) {
         id: authData.user.id, first_name: form.firstName, last_name: form.lastName,
         email: form.email, phone: form.phone, qualification: form.qualification,
         experience: parseInt(form.experience), nmc_registration_number: form.nmcRegistrationNumber,
-        state_medical_council: form.stateMedicalCouncil, document_url: fileName, status: "pending",
+        state_medical_council: form.stateMedicalCouncil, document_url: fileName, status: "active",
       });
       if (dbError) throw dbError;
       await sendEmail({
-        to: form.email, subject: "Application Received – LOCUM",
+        to: form.email, subject: "Welcome to LOCUM – Your Account Is Active",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
           <h1 style="color:#1e3a5f;">LOCUM</h1>
           <h2>Hi Dr. ${form.firstName} ${form.lastName},</h2>
           <p>Thank you for registering on <strong>LOCUM</strong>.</p>
-          <p>Your application is currently <strong>pending verification</strong> by our team. This usually takes up to <strong>24 hours</strong>.</p>
-          <p>You will receive another email once your account is approved and active.</p>
+          <p>Your account is <strong>active</strong>. Log in to see locum duties that match your qualifications and apply.</p>
+          <p>Hospitals review your registration number and certificates before confirming a booking, so keep your profile accurate and up to date.</p>
+          <a href="https://bookmylocum.com/login" style="display:inline-block;padding:14px 28px;background:#1e3a5f;color:white;text-decoration:none;border-radius:8px;margin:8px 0 16px;">Log in to LOCUM</a>
           <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
         </div>`,
       });
       await supabase.auth.signOut();
-      alert("Application submitted! Our team will verify your registration and notify you once approved. This usually takes 24 hours.");
+      alert("Registration complete! Log in to see locum duties that match your qualifications.");
       navigate("/login");
     } catch (err) {
       setError(err.message);
@@ -190,7 +191,7 @@ function DoctorForm({ navigate }) {
     <form onSubmit={submit} className="register-form">
       <h2>Doctor Registration</h2>
       <div style={{ background: "#e3f2fd", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#1565c0", lineHeight: 1.6 }}>
-        ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
+        ℹ️ Your account is active as soon as you register. Hospitals review your registration number and certificate before confirming a booking, so make sure they are accurate.
       </div>
       {error && <p className="error-msg">{error}</p>}
       <div className="form-row">
@@ -262,22 +263,23 @@ function NurseForm({ navigate }) {
         id: authData.user.id, first_name: form.firstName, last_name: form.lastName,
         email: form.email, phone: form.phone, qualification: form.qualification,
         experience: parseInt(form.experience), registration_number: form.registrationNumber,
-        state_nursing_council: form.stateNursingCouncil, document_url: fileName, status: "pending",
+        state_nursing_council: form.stateNursingCouncil, document_url: fileName, status: "active",
       });
       if (dbError) throw dbError;
       await sendEmail({
-        to: form.email, subject: "Application Received – LOCUM",
+        to: form.email, subject: "Welcome to LOCUM – Your Account Is Active",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
           <h1 style="color:#1e3a5f;">LOCUM</h1>
           <h2>Hi ${form.firstName} ${form.lastName},</h2>
           <p>Thank you for registering on <strong>LOCUM</strong>.</p>
-          <p>Your application is currently <strong>pending verification</strong> by our team. This usually takes up to <strong>24 hours</strong>.</p>
-          <p>You will receive another email once your account is approved and active.</p>
+          <p>Your account is <strong>active</strong>. Log in to see locum duties that match your qualifications and apply.</p>
+          <p>Hospitals review your registration number and certificates before confirming a booking, so keep your profile accurate and up to date.</p>
+          <a href="https://bookmylocum.com/login" style="display:inline-block;padding:14px 28px;background:#1e3a5f;color:white;text-decoration:none;border-radius:8px;margin:8px 0 16px;">Log in to LOCUM</a>
           <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
         </div>`,
       });
       await supabase.auth.signOut();
-      alert("Application submitted! Our team will verify your registration and notify you once approved. This usually takes 24 hours.");
+      alert("Registration complete! Log in to see locum duties that match your qualifications.");
       navigate("/login");
     } catch (err) {
       setError(err.message);
@@ -290,7 +292,7 @@ function NurseForm({ navigate }) {
     <form onSubmit={submit} className="register-form">
       <h2>Nurse Registration</h2>
       <div style={{ background: "#f3e5f5", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#6a0dad", lineHeight: 1.6 }}>
-        ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
+        ℹ️ Your account is active as soon as you register. Hospitals review your registration number and certificate before confirming a booking, so make sure they are accurate.
       </div>
       {error && <p className="error-msg">{error}</p>}
       <div className="form-row">
@@ -368,22 +370,23 @@ function TechnicianForm({ navigate }) {
         email: form.email, phone: form.phone, qualification: form.qualification,
         experience: parseInt(form.experience) || 0,
         registration_number: form.registrationNumber,
-        document_url: fileName, status: "pending",
+        document_url: fileName, status: "active",
       });
       if (dbError) throw dbError;
       await sendEmail({
-        to: form.email, subject: "Application Received – LOCUM",
+        to: form.email, subject: "Welcome to LOCUM – Your Account Is Active",
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px;">
           <h1 style="color:#1e3a5f;">LOCUM</h1>
           <h2>Hi ${form.firstName} ${form.lastName},</h2>
           <p>Thank you for registering on <strong>LOCUM</strong> as a <strong>${form.qualification} Technician</strong>.</p>
-          <p>Your application is <strong>pending verification</strong> by our team. This usually takes up to <strong>24 hours</strong>.</p>
-          <p>You will receive another email once your account is approved and active.</p>
+          <p>Your account is <strong>active</strong>. Log in to see locum duties that match your qualifications and apply.</p>
+          <p>Hospitals review your registration number and certificates before confirming a booking, so keep your profile accurate and up to date.</p>
+          <a href="https://bookmylocum.com/login" style="display:inline-block;padding:14px 28px;background:#1e3a5f;color:white;text-decoration:none;border-radius:8px;margin:8px 0 16px;">Log in to LOCUM</a>
           <p style="color:#888;font-size:13px;">— Team LOCUM | <a href="https://bookmylocum.com">bookmylocum.com</a></p>
         </div>`,
       });
       await supabase.auth.signOut();
-      alert("Application submitted! Our team will verify your registration and notify you once approved.");
+      alert("Registration complete! Log in to see locum duties that match your qualifications.");
       navigate("/login");
     } catch (err) {
       setError(err.message);
@@ -396,7 +399,7 @@ function TechnicianForm({ navigate }) {
     <form onSubmit={submit} className="register-form">
       <h2>Technician Registration</h2>
       <div style={{ background: "#e3f2fd", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#1565c0", lineHeight: 1.6 }}>
-        ℹ️ Your registration will be reviewed by our team within 24 hours. You will be notified once approved.
+        ℹ️ Your account is active as soon as you register. Hospitals review your registration number and certificate before confirming a booking, so make sure they are accurate.
       </div>
       {error && <p className="error-msg">{error}</p>}
       <div className="form-row">

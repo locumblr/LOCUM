@@ -524,8 +524,7 @@ function AdminPanel() {
 
       <div className="stats-row">
         <div className="stat-card"><h3>{doctors.filter(d => d.status === "active").length}</h3><p>Active Doctors</p></div>
-        <div className="stat-card orange"><h3>{doctors.filter(d => d.status === "pending").length + nurses.filter(n => n.status === "pending").length + technicians.filter(t => t.status === "pending").length}</h3><p>Pending Approvals</p></div>
-        <div className="stat-card" style={{ borderTop: "3px solid #6a0dad" }}><h3 style={{ color: "#6a0dad" }}>{nurses.filter(n => n.status === "active").length}</h3><p>Active Nurses</p></div>
+                <div className="stat-card" style={{ borderTop: "3px solid #6a0dad" }}><h3 style={{ color: "#6a0dad" }}>{nurses.filter(n => n.status === "active").length}</h3><p>Active Nurses</p></div>
         <div className="stat-card" style={{ borderTop: "3px solid #1565c0" }}><h3 style={{ color: "#1565c0" }}>{technicians.filter(t => t.status === "active").length}</h3><p>Active Technicians</p></div>
         <div className="stat-card green"><h3>{hospitals.filter(h => h.status === "active").length}</h3><p>Active Hospitals</p></div>
         <div className="stat-card orange"><h3>{pendingHospitals.length}</h3><p>Pending Hospitals</p></div>
