@@ -67,7 +67,7 @@ function DepartmentDashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("locum_duties")
-      .select("*, doctors(id, first_name, last_name, phone, email, qualification, experience, document_url), nurses(id, first_name, last_name, phone, email, qualification, experience, document_url)")
+      .select("*")
       .eq("department_id", s.id)
       .order("date", { ascending: false });
     if (!error) setDuties(data || []);
