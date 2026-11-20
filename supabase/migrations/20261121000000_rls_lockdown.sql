@@ -40,6 +40,11 @@ revoke execute on function public.verify_department_login(text, text) from authe
 -- Plain-text department passwords are no longer used; logins check password_hash.
 update public.hospital_departments set password = null;
 
+-- Existing codes were built from the hospital and department names and could be
+-- guessed. Give each a random suffix; hospitals see the new codes on their profile.
+update public.hospital_departments
+set department_code = department_code || '-' || upper(substr(md5(gen_random_uuid()::text), 1, 4));
+
 -- ---------------------------------------------------------------------------
 -- Guards for columns only the server or an admin may change
 -- ---------------------------------------------------------------------------
